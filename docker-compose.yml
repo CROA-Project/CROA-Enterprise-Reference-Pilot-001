@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  ui:
+    build: ./ui
+    ports:
+      - "8080:80"
+    networks:
+      - edge_network
+    depends_on:
+      - croa_plane
+      - c6_firewall
+
+  croa_plane:
+    build: ./croa_plane
+    ports:
+      - "8001:8000"
+    networks:
+      - edge_network
+    volumes:
+      - ./evidence_data:/app/evidence_data
+
+  c6_firewall:
+    build: ./c6_firewall
+    ports:
+      - "8002:8000"
+    networks:
+      - edge_network
+      - governed_network
+
+  acmeops_api:
+    build: ./acmeops_api
+    # No exposed ports on the host
+    networks:
+      - governed_network
+
+networks:
+  edge_network:
+    driver: bridge
+  governed_network:
+    driver: bridge
+    internal: true

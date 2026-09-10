@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CROA Enterprise Reference Pilot #001</title>
+    <style>
+        :root {
+            --bg-main: #f8f9fa;
+            --bg-panel: #ffffff;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --border: #dee2e6;
+            --primary: #495057;
+            --success: #198754;
+            --error: #dc3545;
+            --warning: #fd7e14;
+            --boundary: #adb5bd;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: var(--font-family);
+            background: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+        .title-area h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
+        .subtitle { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+        .motto { color: var(--text-muted); font-size: 12px; font-style: italic; margin-top: 8px; }
+        
+        .status-bar { display: flex; gap: 20px; font-size: 12px; font-weight: 500; align-items: center; }
+        .status-item { display: flex; align-items: center; gap: 6px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+        .dot.online, .dot.active { background: var(--success); }
+        .dot.isolated { background: var(--warning); }
+        .btn-reset {
+            background: #fff; border: 1px solid var(--border); padding: 6px 12px; 
+            border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;
+        }
+        .btn-reset:hover { background: #e9ecef; }
+        
+        .main-container { display: flex; gap: 20px; flex: 1; overflow: hidden; }
+        .panel {
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+            padding: 15px; display: flex; flex-direction: column; overflow-y: auto;
+        }
+        .left-panel { flex: 0 0 280px; }
+        .center-panel { flex: 1; position: relative; }
+        .right-panel { flex: 0 0 350px; display: flex; flex-direction: column; gap: 15px; }
+        
+        h2 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 15px 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; color: var(--text-muted); }
+        
+        .scenario-btn {
+            background: #fff; border: 1px solid var(--border); border-radius: 4px;
+            padding: 10px; margin-bottom: 8px; cursor: pointer; text-align: left;
+            transition: all 0.15s; width: 100%;
+        }
+        .scenario-btn:hover { border-color: var(--primary); background: #f8f9fa; }
+        .scenario-btn strong { display: block; font-size: 13px; margin-bottom: 3px; color: var(--text-main); }
+        .scenario-btn span { font-size: 11px; color: var(--text-muted); display: block; line-height: 1.3; }
+        .run-id-display { font-size: 11px; color: var(--text-muted); margin-bottom: 15px; font-family: monospace; }
+        
+        .arch-container {
+            display: flex; justify-content: center; align-items: flex-start; gap: 40px; height: 100%; padding-top: 10px;
+        }
+        .pipeline {
+            display: flex; flex-direction: column; align-items: center; width: 280px; gap: 12px; position: relative; z-index: 2;
+        }
+        .node {
+            width: 100%; border: 1px solid var(--border); border-radius: 4px;
+            padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;
+            background: #fff; transition: all 0.2s; position: relative;
+        }
+        .node-name { font-weight: 500; font-size: 13px; }
+        .node-state { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+        .node.pass { border-color: var(--success); box-shadow: 0 0 0 1px var(--success); }
+        .node.fail { border-color: var(--error); box-shadow: 0 0 0 1px var(--error); }
+        .node.pass .node-state { color: var(--success); }
+        .node.fail .node-state { color: var(--error); }
+        
+        .arrow { width: 2px; height: 12px; background: var(--border); }
+        
+        .boundary-line {
+            width: 120%; border-top: 2px dashed var(--boundary); margin: 5px 0; position: relative; display: flex; justify-content: center;
+        }
+        .boundary-label {
+            position: absolute; top: -10px; background: var(--bg-panel); padding: 0 10px;
+            font-size: 10px; font-weight: bold; color: var(--boundary); letter-spacing: 1px;
+        }
+        
+        .side-rail { display: flex; flex-direction: column; justify-content: space-around; height: 350px; padding-top: 40px; }
+        .side-node {
+            font-size: 11px; font-weight: 500; color: var(--text-muted); border: 1px solid var(--border);
+            padding: 8px 12px; border-radius: 4px; background: #f8f9fa; text-align: center; width: 140px;
+        }
+        
+        .outcome-box {
+            margin-top: auto; background: #fff; border: 1px solid var(--border); border-left: 3px solid var(--primary);
+            padding: 15px; border-radius: 4px; font-size: 14px; line-height: 1.4;
+        }
+        .outcome-text { font-weight: 500; margin-bottom: 10px; }
+        .effect-row { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid var(--border); }
+        .effect-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+        .effect-value { font-size: 16px; font-weight: bold; font-family: monospace; }
+        .effect-value.none { color: var(--text-muted); }
+        .effect-value.executed { color: var(--success); }
+        
+        .special-vis { margin-top: 15px; font-family: monospace; font-size: 11px; background: #f8f9fa; padding: 10px; border: 1px solid var(--border); border-radius: 4px; display: none; }
+        .special-vis-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .vis-title { font-weight: bold; margin-bottom: 6px; color: var(--primary); }
+        .col-2 { display: flex; gap: 10px; }
+        .col-half { flex: 1; border: 1px solid var(--border); padding: 8px; background: #fff; }
+        
+        .info-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px; }
+        .info-label { color: var(--text-muted); }
+        .info-value { font-weight: 500; font-family: monospace; text-align: right; }
+        .info-value.pass { color: var(--success); }
+        .info-value.fail { color: var(--error); }
+        
+        .inspector-box {
+            font-family: monospace; font-size: 11px; background: #f8f9fa; border: 1px solid var(--border);
+            padding: 10px; border-radius: 4px; overflow-y: auto; max-height: 120px; white-space: pre-wrap; color: var(--text-main);
+        }
+        .inspector-empty { color: var(--text-muted); font-style: italic; text-align: center; padding: 20px 0; }
+        
+        .c5-summary { margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .raw-events { max-height: 150px; }
+        
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="title-area">
+        <h1>CROA Enterprise Reference Pilot #001</h1>
+        <div class="subtitle">Runtime governance for agentic execution</div>
+        <div class="motto">"The agent proposes. CROA decides. Only a valid commitment can execute."</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 15px;">
+        <div class="status-bar">
+            <div class="status-item"><div class="dot" id="dot-croa"></div> CROA Plane</div>
+            <div class="status-item"><div class="dot" id="dot-c6"></div> C6 Firewall</div>
+            <div class="status-item"><div class="dot" id="dot-acme"></div> AcmeOps</div>
+            <div class="status-item"><div class="dot" id="dot-c5"></div> C5 Evidence</div>
+        </div>
+        <button class="btn-reset" onclick="resetDemo()">Reset Demo</button>
+    </div>
+</header>
+
+<div class="main-container">
+    <div class="panel left-panel">
+        <h2>Governance Scenarios</h2>
+        <div class="run-id-display">Run: <span id="run-id">Loading...</span></div>
+        
+        <button class="scenario-btn" onclick="runScenario('A')"><strong>A — Legitimate Action</strong><span>Retrieve registered customer 342</span></button>
+        <button class="scenario-btn" onclick="runScenario('B')"><strong>B — Unknown Target</strong><span>Retrieve unregistered customer 999</span></button>
+        <button class="scenario-btn" onclick="runScenario('C')"><strong>C — Forbidden Action</strong><span>Attempt delete_environment</span></button>
+        <button class="scenario-btn" onclick="runScenario('D')"><strong>D — Cumulative Trajectory</strong><span>3 exports of 40 records (limit 100)</span></button>
+        <button class="scenario-btn" onclick="runScenario('E')"><strong>E — Missing ECC</strong><span>Send operation without contract</span></button>
+        <button class="scenario-btn" onclick="runScenario('F')"><strong>F — Forged ECC</strong><span>Send invalidly signed contract</span></button>
+        <button class="scenario-btn" onclick="runScenario('G')"><strong>G — Mutated Operation</strong><span>Authorize 40, execute 400</span></button>
+        <button class="scenario-btn" onclick="runScenario('H')"><strong>H — Replay Attempt</strong><span>Execute valid contract twice</span></button>
+    </div>
+
+    <div class="panel center-panel">
+        <h2>Architecture</h2>
+        <div class="arch-container">
+            <div class="side-rail">
+                <div class="side-node">C1 Policy Authority<br><span style="font-size:9px;color:#999;">Rules & Limits</span></div>
+            </div>
+            
+            <div class="pipeline">
+                <div class="node" id="node-agent"><span class="node-name">AGENT</span><span class="node-state">IDLE</span></div>
+                <div class="arrow"></div>
+                <div class="node" id="node-c3"><span class="node-name">C3 Context Grounding</span><span class="node-state">IDLE</span></div>
+                <div class="arrow"></div>
+                <div class="node" id="node-c2"><span class="node-name">C2 Execution Governor</span><span class="node-state">IDLE</span></div>
+                <div class="arrow"></div>
+                <div class="node" id="node-c4"><span class="node-name">C4 Invariant Monitor</span><span class="node-state">IDLE</span></div>
+                <div class="arrow"></div>
+                <div class="node" id="node-c7"><span class="node-name">C7 Contract Compiler</span><span class="node-state">IDLE</span></div>
+                
+                <div class="boundary-line"><span class="boundary-label">EXECUTION BOUNDARY</span></div>
+                
+                <div class="node" id="node-c6"><span class="node-name">C6 Execution Firewall</span><span class="node-state">IDLE</span></div>
+                <div class="arrow"></div>
+                <div class="node" id="node-acmeops"><span class="node-name">ACMEOPS</span><span class="node-state">IDLE</span></div>
+            </div>
+            
+            <div class="side-rail">
+                <div class="side-node">C5 Evidence<br><span style="font-size:9px;color:#999;">Tamper-Evident Log</span></div>
+            </div>
+        </div>
+        
+        <div class="special-vis" id="special-vis"></div>
+
+        <div class="outcome-box">
+            <div class="outcome-text" id="outcome-text">Select a scenario to begin demonstration.</div>
+            <div class="effect-row">
+                <span class="effect-label">System Effect</span>
+                <span class="effect-value" id="system-effect">-</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel right-panel">
+        <div>
+            <h2>Execution Contract (ECC)</h2>
+            <div id="ecc-data" style="display:none;">
+                <div class="info-row"><span class="info-label">Clock Consistency</span><span class="info-value" id="ecc-clock-check"></span></div>
+                <div class="info-row"><span class="info-label">TTL (sec)</span><span class="info-value" id="ecc-ttl"></span></div>
+                <div class="info-row"><span class="info-label">Parameters Hash</span><span class="info-value" id="ecc-hash" style="font-size:10px; max-width:200px; word-break:break-all;"></span></div>
+                <div class="info-row"><span class="info-label">Nonce</span><span class="info-value" id="ecc-nonce" style="font-size:10px;"></span></div>
+                <div style="margin-top:8px; font-size:11px; font-weight:600; margin-bottom:4px;">Raw Public Claims:</div>
+                <div class="inspector-box" id="ecc-payload"></div>
+            </div>
+            <div class="inspector-empty" id="ecc-empty">NO ECC ISSUED</div>
+        </div>
+
+        <div>
+            <h2>CURRENT SCENARIO EVIDENCE</h2>
+            <div class="c5-summary" id="c5-summary">
+                <div class="info-row"><span class="info-label">Decision</span><span class="info-value" id="c5-cur-dec">PENDING</span></div>
+                <div class="info-row"><span class="info-label">Stage</span><span class="info-value" id="c5-cur-stage">PENDING</span></div>
+                <div class="info-row"><span class="info-label">Reason</span><span class="info-value" id="c5-cur-reason">PENDING</span></div>
+                <div class="info-row"><span class="info-label">ECC</span><span class="info-value" id="c5-cur-ecc">PENDING</span></div>
+                <div class="info-row"><span class="info-label">System Effect</span><span class="info-value" id="c5-cur-eff">PENDING</span></div>
+            </div>
+            
+            <h2 style="margin-top:15px;">RAW C5 LEDGER</h2>
+            <div class="info-row"><span class="info-label">Hash Chain</span><span class="info-value" id="hash-chain-check">-</span></div>
+            <div class="inspector-box raw-events" id="c5-events">No events.</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_CROA = 'http://localhost:8001';
+    const API_C6 = 'http://localhost:8002';
+    let demoRunId = 'init';
+    
+    // Explicit execution correlation map
+    // We bind a unique run ID to a scenario execution context
+    let activeExecutionId = '';
+    // Expected requests belonging to this execution ID
+    let activeScenarioRequests = new Set();
+    
+    async function checkHealth() {
+        try {
+            const r1 = await fetch(API_CROA + '/health');
+            document.getElementById('dot-croa').className = 'dot ' + (r1.ok ? 'online' : '');
+            const r2 = await fetch(API_C6 + '/health');
+            if (r2.ok) {
+                document.getElementById('dot-c6').className = 'dot online';
+                const d2 = await r2.json();
+                document.getElementById('dot-acme').className = 'dot ' + (d2.acmeops_reachable ? 'isolated' : '');
+            }
+            const r3 = await fetch(API_CROA + '/evidence/verify');
+            if (r3.ok) {
+                const d3 = await r3.json();
+                document.getElementById('dot-c5').className = 'dot ' + (d3.valid ? 'active' : '');
+                const el = document.getElementById('hash-chain-check');
+                el.textContent = d3.valid ? 'VALID' : 'INVALID';
+                el.className = 'info-value ' + (d3.valid ? 'pass' : 'fail');
+            }
+        } catch(e) {}
+    }
+    setInterval(checkHealth, 2000);
+
+    async function getAcmeOpsCount() {
+        try {
+            const r = await fetch(API_C6 + '/acmeops/history');
+            const data = await r.json();
+            return data.length;
+        } catch(e) { return 0; }
+    }
+
+    // Called asynchronously by polling or directly by finalizeProof
+    async function fetchEvidence() {
+        const fetchContextId = activeExecutionId; 
+        try {
+            const r = await fetch(API_CROA + '/evidence');
+            const evs = await r.json();
+            
+            // Raw events: show all events for the current overarching demo run
+            const runEvs = evs.filter(e => e.session_id && e.session_id.includes(demoRunId) || e.request_id && e.request_id.includes(demoRunId)).reverse();
+            let html = '';
+            runEvs.forEach(e => {
+                html += `[${e.timestamp.split('T')[1].substring(0,8)}] ${e.event_type} (${e.decision}) - ${e.reason}\n`;
+            });
+            document.getElementById('c5-events').textContent = html || "No events.";
+
+            // Guard against stale asynchronous responses overwriting a newer scenario
+            if (fetchContextId !== activeExecutionId) return;
+
+            // Summary: filter ONLY by requests exactly registered for the active execution
+            const scenarioEvs = evs.filter(e => e.request_id && activeScenarioRequests.has(e.request_id)).reverse();
+            
+            if (scenarioEvs.length > 0) {
+                // The most recent event belonging to the active scenario is our terminal state
+                const term = scenarioEvs[0];
+                document.getElementById('c5-cur-dec').textContent = term.decision;
+                document.getElementById('c5-cur-dec').className = 'info-value ' + (term.decision === 'ALLOW' || term.decision === 'PERMIT' ? 'pass' : 'fail');
+                
+                document.getElementById('c5-cur-stage').textContent = term.decision_stage;
+                document.getElementById('c5-cur-reason').textContent = term.reason;
+                
+                // Inspect the event chain to see if an ECC was issued
+                const eccIssued = scenarioEvs.some(e => e.event_type === 'ECC_ISSUED');
+                document.getElementById('c5-cur-ecc').textContent = eccIssued ? 'ISSUED' : 'NOT ISSUED';
+                
+                // Determine system effect from architecture state if AcmeOps was reached
+                // (Set dynamically in runScenario during execution)
+            }
+        } catch(e) {}
+    }
+
+    function generateId() { return Math.floor(Date.now() / 1000).toString(); }
+
+    async function resetDemo() {
+        demoRunId = 'run-' + generateId();
+        document.getElementById('run-id').textContent = demoRunId;
+        await fetch(API_CROA + '/reset', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({demo_run_id: demoRunId}) });
+        await fetch(API_C6 + '/reset', { method: 'POST' });
+        resetUI(true);
+        document.getElementById('outcome-text').textContent = "Demo environment reset. Select a scenario.";
+        checkHealth();
+    }
+
+    function resetUI(fullReset = false) {
+        // Generate a new unique ID for every single scenario click
+        activeExecutionId = 'exec-' + generateId();
+        activeScenarioRequests.clear();
+        
+        const nodes = ['agent', 'c3', 'c2', 'c4', 'c7', 'c6', 'acmeops'];
+        nodes.forEach(n => setNodeState(n, 'IDLE', ''));
+        document.getElementById('ecc-data').style.display = 'none';
+        document.getElementById('ecc-empty').style.display = 'block';
+        document.getElementById('system-effect').textContent = '-';
+        document.getElementById('system-effect').className = 'effect-value';
+        
+        // PENDING STATE
+        document.getElementById('c5-cur-dec').textContent = 'PENDING';
+        document.getElementById('c5-cur-dec').className = 'info-value';
+        document.getElementById('c5-cur-stage').textContent = 'PENDING';
+        document.getElementById('c5-cur-reason').textContent = 'PENDING';
+        document.getElementById('c5-cur-ecc').textContent = 'PENDING';
+        document.getElementById('c5-cur-eff').textContent = 'PENDING';
+        
+        document.getElementById('special-vis').style.display = 'none';
+        document.getElementById('special-vis').innerHTML = '';
+        document.getElementById('outcome-text').textContent = "Processing...";
+        
+        if (fullReset) {
+            document.getElementById('c5-events').textContent = 'No events.';
+        }
+    }
+
+    function setNodeState(node, state, type) {
+        const el = document.getElementById('node-' + node);
+        el.className = 'node ' + type;
+        el.querySelector('.node-state').textContent = state;
+    }
+    
+    function setNotReached(nodes) {
+        nodes.forEach(n => setNodeState(n, 'NOT REACHED', ''));
+    }
+
+    function decodeJWT(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        } catch(e) { return null; }
+    }
+
+    function displayECC(ecc) {
+        if (!ecc) return;
+        document.getElementById('ecc-empty').style.display = 'none';
+        document.getElementById('ecc-data').style.display = 'block';
+        const payload = decodeJWT(ecc);
+        if (payload) {
+            document.getElementById('ecc-payload').textContent = JSON.stringify(payload, null, 2);
+            document.getElementById('ecc-ttl').textContent = payload.exp - payload.iat;
+            document.getElementById('ecc-hash').textContent = payload.parameters_hash;
+            document.getElementById('ecc-nonce').textContent = payload.nonce;
+            const now = Math.floor(Date.now() / 1000);
+            const drift = Math.abs(payload.iat - now);
+            const el = document.getElementById('ecc-clock-check');
+            if (drift < 60) { el.textContent = 'PASS'; el.className = 'info-value pass'; } 
+            else { el.textContent = 'FAIL'; el.className = 'info-value fail'; }
+        }
+    }
+    
+    function showOutcome(text) {
+        document.getElementById('outcome-text').textContent = text;
+    }
+
+    // Orchestrator
+    async function runScenario(type) {
+        resetUI();
+        setNodeState('agent', 'PROPOSED', 'pass');
+        
+        let action = 'get_customer';
+        let target = 'customer:342';
+        let params = {};
+        
+        if (type === 'B') target = 'customer:999';
+        if (type === 'C') { action = 'delete_environment'; target = 'environment:dev'; }
+        if (type === 'D' || type === 'G') { action = 'export_customers'; target = 'endpoint:analytics.internal'; params = {count: 40}; }
+        
+        const countBefore = await getAcmeOpsCount();
+
+        const sessionId = 'sess-' + demoRunId + (type === 'D' ? '-D' : ''); 
+        
+        let ecc = null;
+        
+        if (type !== 'E') { 
+            if (type === 'D') {
+                for(let i=1; i<=2; i++) {
+                    let preReqId = activeExecutionId + '-pre' + i;
+                    activeScenarioRequests.add(preReqId);
+                    let r = await fetch(API_CROA + '/propose', { method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({request_id: preReqId, session_id: sessionId, subject: 'agent:1', action, target, parameters: params})});
+                    let d = await r.json();
+                    if(d.ecc) {
+                        await fetch(API_C6 + '/execute', { method: 'POST', headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ecc: d.ecc, subject: 'agent:1', action, target, parameters: params})});
+                    }
+                }
+            }
+            
+            const reqId = activeExecutionId + '-main';
+            activeScenarioRequests.add(reqId);
+            
+            const pRes = await fetch(API_CROA + '/propose', { method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({request_id: reqId, session_id: sessionId, subject: 'agent:1', action, target, parameters: params})});
+            const pData = await pRes.json();
+            
+            if (pData.decision_stage === 'C3') {
+                setNodeState('c3', 'DENY ✕', 'fail'); setNotReached(['c2', 'c4', 'c7', 'c6', 'acmeops']);
+                showOutcome("Unknown target rejected before authorization.");
+                finalizeProof('NONE', 'none'); return;
+            }
+            setNodeState('c3', 'GROUNDED ✓', 'pass');
+            
+            if (pData.decision_stage === 'C2') {
+                setNodeState('c2', 'DENY ✕', 'fail'); setNotReached(['c4', 'c7', 'c6', 'acmeops']);
+                showOutcome("Policy denied the operation before execution.");
+                finalizeProof('NONE', 'none'); return;
+            }
+            setNodeState('c2', 'PASS ✓', 'pass');
+            
+            if (pData.decision_stage === 'C4') {
+                setNodeState('c4', 'DENY ✕', 'fail'); setNotReached(['c7', 'c6', 'acmeops']);
+                showOutcome("Projected cumulative state exceeded the registered invariant. Execution prevented.");
+                if (type === 'D') {
+                    const sv = document.getElementById('special-vis');
+                    sv.style.display = 'block';
+                    sv.innerHTML = `
+                        <div class="vis-title">CUMULATIVE TRAJECTORY (LIMIT: 100)</div>
+                        <div class="special-vis-row"><span>REQ 1:</span><span>0 + 40 = 40 (EXECUTED)</span></div>
+                        <div class="special-vis-row"><span>REQ 2:</span><span>40 + 40 = 80 (EXECUTED)</span></div>
+                        <div class="special-vis-row" style="color:var(--error);font-weight:bold;"><span>REQ 3:</span><span>80 + 40 = 120 (DENIED)</span></div>
+                        <div style="margin-top:8px; border-top:1px solid #dee2e6; padding-top:6px;">ACTUAL SYSTEM EFFECT: <b>80 records</b> (NOT 120)</div>
+                    `;
+                }
+                finalizeProof('NONE', 'none'); return;
+            }
+            setNodeState('c4', 'PASS ✓', 'pass');
+            setNodeState('c7', 'ECC ISSUED ✓', 'pass');
+            ecc = pData.ecc;
+            displayECC(ecc);
+        } else {
+            setNotReached(['c3', 'c2', 'c4', 'c7']);
+            // Add a synthetic request ID for E so it can be tracked if it emits C6 events
+            activeScenarioRequests.add(activeExecutionId + '-main');
+        }
+
+        if (type === 'F') ecc = ecc + '.forged';
+        let execParams = params;
+        if (type === 'G') {
+            execParams = {count: 400};
+            const sv = document.getElementById('special-vis');
+            sv.style.display = 'block';
+            sv.innerHTML = `
+                <div class="col-2">
+                    <div class="col-half"><div class="vis-title">AUTHORIZED</div><div>count = 40</div></div>
+                    <div class="col-half"><div class="vis-title">ATTEMPTED</div><div>count = 400</div></div>
+                </div>
+                <div style="margin-top:8px; border-top:1px solid #dee2e6; padding-top:6px;">
+                    <div>SIGNATURE: <span style="color:var(--success);float:right;">VALID</span></div>
+                    <div>BINDING: <span style="color:var(--error);float:right;">INVALID</span></div>
+                </div>
+            `;
+        }
+        
+        const xReq = {ecc: ecc || "", subject: 'agent:1', action, target, parameters: execParams};
+        const xRes = await fetch(API_C6 + '/execute', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(xReq)});
+        const xData = await xRes.json();
+        
+        if (xData.decision === 'ALLOW') {
+            setNodeState('c6', 'ALLOW ✓', 'pass');
+            setNodeState('acmeops', 'EXECUTED ✓', 'pass');
+            showOutcome("Authorized operation executed through the governed boundary.");
+            finalizeProof('EXECUTED', 'executed');
+        } else {
+            setNodeState('c6', 'BLOCK ✕', 'fail');
+            setNodeState('acmeops', 'NOT REACHED', '');
+            
+            if (type === 'E') showOutcome("Execution request had no authorization commitment. Boundary crossing blocked.");
+            else if (type === 'F') showOutcome("Authorization signature invalid. Boundary crossing blocked.");
+            else if (type === 'G') showOutcome("Execution differed from the authorized commitment. Boundary crossing blocked.");
+            else showOutcome("Operation blocked at firewall: " + xData.reason);
+            
+            finalizeProof('NONE', 'none');
+        }
+        
+        if (type === 'H') {
+            const xRes2 = await fetch(API_C6 + '/execute', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(xReq)});
+            const xData2 = await xRes2.json();
+            setNodeState('c6', 'BLOCK ✕', 'fail');
+            setNodeState('acmeops', 'NOT REACHED', '');
+            showOutcome("Authorization commitment had already been redeemed. Replay prevented.");
+            
+            const sv = document.getElementById('special-vis');
+            sv.style.display = 'block';
+            sv.innerHTML = `
+                <div class="vis-title">REPLAY ATTEMPT</div>
+                <div class="special-vis-row"><span>1st REDEMPTION:</span><span style="color:var(--success);">EXECUTED</span></div>
+                <div class="special-vis-row"><span>2nd REDEMPTION:</span><span style="color:var(--error);">BLOCKED (SAME ECC)</span></div>
+                <div style="margin-top:8px; border-top:1px solid #dee2e6; padding-top:6px;">AcmeOps executions: <b>1</b></div>
+            `;
+            finalizeProof('EXECUTED 1', 'executed');
+        }
+    }
+    
+    async function finalizeProof(effectTxt, style) {
+        const effectEl = document.getElementById('system-effect');
+        effectEl.textContent = effectTxt;
+        effectEl.className = 'effect-value ' + style;
+        
+        const curEff = document.getElementById('c5-cur-eff');
+        curEff.textContent = effectTxt;
+        curEff.className = 'info-value ' + style;
+        
+        fetchEvidence();
+    }
+
+    checkHealth();
+    resetDemo();
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# Ignore keys
+*.pem
+private.pem
+public.pem
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# Evidence
+evidence_data/
