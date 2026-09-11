@@ -1,4 +1,4 @@
-# CROA Enterprise Reference Pilot #001
+﻿# CROA Enterprise Reference Pilot #001
 
 ## Purpose
 Build a small, fully local, reproducible enterprise-style demonstration of the **Constrained Reachability Orchestration Architecture (CROA)**. 
@@ -16,6 +16,7 @@ The pilot consists of four distinct containers simulating enterprise boundaries:
 ## Quick Start
 From a clean local environment, simply run:
 ```bash
+python scripts/generate_pilot_keys.py
 docker compose build
 docker compose up -d
 ```
@@ -24,14 +25,14 @@ Then navigate your browser to:
 
 ## Demo Scenarios
 The UI provides 8 pre-configured scenarios that interact directly with the live pilot containers:
-- **A — Legitimate Action**: Normal operation generating a valid ECC and executing.
-- **B — Unknown Target**: Fails at C3 context grounding (resource not registered).
-- **C — Forbidden Action**: Fails at C2 static policy check.
-- **D — Cumulative Trajectory**: Attempting 3 exports of 40 records under a 100-record session limit. The third request is blocked by C4 *before* an ECC is issued.
-- **E — Missing ECC**: Direct call to C6 without a contract is blocked.
-- **F — Forged ECC**: Invalidly signed contract is blocked by C6.
-- **G — Mutated Operation**: ECC issued for 40 records, but C6 is asked to execute 400. Blocked by payload binding mismatch.
-- **H — Replay Attempt**: Re-submitting an already redeemed valid ECC is blocked.
+- **A â€” Legitimate Action**: Normal operation generating a valid ECC and executing.
+- **B â€” Unknown Target**: Fails at C3 context grounding (resource not registered).
+- **C â€” Forbidden Action**: Fails at C2 static policy check.
+- **D â€” Cumulative Trajectory**: Attempting 3 exports of 40 records under a 100-record session limit. The third request is blocked by C4 *before* an ECC is issued.
+- **E â€” Missing ECC**: Direct call to C6 without a contract is blocked.
+- **F â€” Forged ECC**: Invalidly signed contract is blocked by C6.
+- **G â€” Mutated Operation**: ECC issued for 40 records, but C6 is asked to execute 400. Blocked by payload binding mismatch.
+- **H â€” Replay Attempt**: Re-submitting an already redeemed valid ECC is blocked.
 
 ## What the Pilot Demonstrates
 - Agent proposals are decoupled from execution.
@@ -50,7 +51,8 @@ This is an author-operated reference pilot. It is not:
 
 ## Security Model
 - **Network Isolation**: `acmeops_api` is on an internal docker network and publishes no ports. It cannot be reached directly by the UI or the `croa_plane`. Only `c6_firewall` has dual-network membership.
-- **Key Hygiene**: The `croa_plane` holds `private.pem`. `c6_firewall` only holds `public.pem`. The UI never sees the private key. Keys are ignored by source control.
+- **Key Hygiene**: The `croa_plane` holds `private.pem`. `c6_firewall` only holds `public.pem`. The UI never sees the private key.
+- **Key Provisioning**: Keys are strictly local pilot artifacts. `private.pem` is never committed to version control. They are generated locally via `scripts/generate_pilot_keys.py`. This mechanism represents local pilot custody, not a production KMS/HSM.
 
 ## Known Limitations
 - The C5 hash chain is a simplified local JSONL implementation.
@@ -72,8 +74,9 @@ The automated test scripts are stored in the `scratch/` directory. They can be e
 
 ```bash
 # Phase 4.1 Regression Tests
-cat scratch/test_phase4.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
+cat tests/test_phase4.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
 
 # Phase 5 Automated UI Scenarios
-cat scratch/test_phase5.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
+cat tests/test_phase5.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
 ```
+

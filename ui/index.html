@@ -255,12 +255,133 @@
     const API_C6 = 'http://localhost:8002';
     let demoRunId = 'init';
     
-    // Explicit execution correlation map
-    // We bind a unique run ID to a scenario execution context
-    let activeExecutionId = '';
-    // Expected requests belonging to this execution ID
-    let activeScenarioRequests = new Set();
+    // Canonical Active Scenario State
+    let activeScenarioState = {
+        generation: 0,
+        requestIds: new Set(),
+        architecture: {
+            agent: { state: 'IDLE', type: '' },
+            c3: { state: 'IDLE', type: '' },
+            c2: { state: 'IDLE', type: '' },
+            c4: { state: 'IDLE', type: '' },
+            c7: { state: 'IDLE', type: '' },
+            c6: { state: 'IDLE', type: '' },
+            acmeops: { state: 'IDLE', type: '' }
+        },
+        c5: {
+            decision: 'PENDING',
+            stage: 'PENDING',
+            reason: 'PENDING',
+            ecc: 'PENDING',
+            effect: 'PENDING'
+        },
+        eccData: null,
+        outcome: 'Evaluating...',
+        systemEffectValue: 'PENDING',
+        systemEffectStyle: 'none'
+    };
     
+    function setArch(node, state, type) {
+        activeScenarioState.architecture[node] = { state, type };
+    }
+    
+    function setNotReached(nodes) {
+        nodes.forEach(n => setArch(n, 'NOT REACHED', ''));
+    }
+    
+    function decodeJWT(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        } catch(e) { return null; }
+    }
+
+    function renderState() {
+        // Assertions
+        const arch = activeScenarioState.architecture;
+        const c5 = activeScenarioState.c5;
+        
+        let assertionErrors = [];
+        if (c5.stage === 'C7' && c5.reason === 'ECC_GENERATED') {
+            if (arch.c2.state.includes('DENY')) assertionErrors.push("C2 MUST NOT show DENY if C7 ECC_GENERATED.");
+            if (arch.c7.state.includes('NOT REACHED')) assertionErrors.push("C7 MUST NOT show NOT REACHED if C7 ECC_GENERATED.");
+            if (c5.ecc !== 'ISSUED') assertionErrors.push("ECC MUST be ISSUED if C7 ECC_GENERATED.");
+        }
+        
+        if (arch.c2.state.includes('DENY')) {
+            if (c5.ecc === 'ISSUED') assertionErrors.push("ECC MUST be NOT ISSUED if C2 DENY.");
+            if (c5.stage !== 'C2' && c5.stage !== 'PENDING') assertionErrors.push("Stage MUST be C2 if C2 DENY.");
+            if (c5.decision !== 'DENY' && c5.decision !== 'PENDING') assertionErrors.push("Decision MUST be DENY if C2 DENY.");
+            if (c5.effect !== 'NONE' && c5.effect !== 'PENDING') assertionErrors.push("Effect MUST be NONE if C2 DENY.");
+        }
+        
+        if (c5.ecc === 'ISSUED') {
+            if (arch.c7.state.includes('NOT REACHED')) assertionErrors.push("C7 cannot be NOT REACHED if ECC ISSUED.");
+        }
+        
+        if (assertionErrors.length > 0) {
+            console.error("CONSISTENCY ASSERTION FAILURES:", assertionErrors);
+            activeScenarioState.outcome = "CONSISTENCY FAILURE: " + assertionErrors.join("; ");
+        }
+        
+        // Render Architecture
+        Object.keys(arch).forEach(node => {
+            const el = document.getElementById('node-' + node);
+            if (el) {
+                el.className = 'node ' + arch[node].type;
+                el.querySelector('.node-state').textContent = arch[node].state;
+            }
+        });
+        
+        // Render C5 Evidence
+        document.getElementById('c5-cur-dec').textContent = c5.decision;
+        document.getElementById('c5-cur-dec').className = 'info-value ' + (c5.decision === 'ALLOW' || c5.decision === 'PERMIT' ? 'pass' : (c5.decision === 'PENDING' ? '' : 'fail'));
+        document.getElementById('c5-cur-stage').textContent = c5.stage;
+        document.getElementById('c5-cur-reason').textContent = c5.reason;
+        document.getElementById('c5-cur-ecc').textContent = c5.ecc;
+        document.getElementById('c5-cur-eff').textContent = c5.effect;
+        
+        // Render System Effect
+        const effectEl = document.getElementById('system-effect');
+        effectEl.textContent = activeScenarioState.systemEffectValue;
+        effectEl.className = 'effect-value ' + activeScenarioState.systemEffectStyle;
+        
+        // Render Outcome
+        const outcomeEl = document.getElementById('outcome-text');
+        outcomeEl.textContent = activeScenarioState.outcome;
+        if (assertionErrors.length > 0) {
+            outcomeEl.style.color = "var(--error)";
+        } else {
+            outcomeEl.style.color = "inherit";
+        }
+        
+        // Render ECC
+        if (c5.ecc === 'ISSUED' && activeScenarioState.eccData) {
+            document.getElementById('ecc-empty').style.display = 'none';
+            document.getElementById('ecc-data').style.display = 'block';
+            const payload = decodeJWT(activeScenarioState.eccData);
+            if (payload) {
+                document.getElementById('ecc-payload').textContent = JSON.stringify(payload, null, 2);
+                document.getElementById('ecc-ttl').textContent = payload.exp - payload.iat;
+                document.getElementById('ecc-hash').textContent = payload.parameters_hash;
+                document.getElementById('ecc-nonce').textContent = payload.nonce;
+                const now = Math.floor(Date.now() / 1000);
+                const drift = Math.abs(payload.iat - now);
+                const el = document.getElementById('ecc-clock-check');
+                if (drift < 60) { el.textContent = 'PASS'; el.className = 'info-value pass'; } 
+                else { el.textContent = 'FAIL'; el.className = 'info-value fail'; }
+            }
+        } else {
+            document.getElementById('ecc-empty').style.display = 'block';
+            document.getElementById('ecc-data').style.display = 'none';
+            document.getElementById('ecc-empty').textContent = c5.ecc === 'PENDING' ? 'PENDING' : 'NO ECC ISSUED';
+        }
+    }
+
     async function checkHealth() {
         try {
             const r1 = await fetch(API_CROA + '/health');
@@ -283,22 +404,14 @@
     }
     setInterval(checkHealth, 2000);
 
-    async function getAcmeOpsCount() {
-        try {
-            const r = await fetch(API_C6 + '/acmeops/history');
-            const data = await r.json();
-            return data.length;
-        } catch(e) { return 0; }
-    }
-
-    // Called asynchronously by polling or directly by finalizeProof
+    // Fetch evidence loop
     async function fetchEvidence() {
-        const fetchContextId = activeExecutionId; 
+        const fetchGen = activeScenarioState.generation; 
         try {
             const r = await fetch(API_CROA + '/evidence');
             const evs = await r.json();
             
-            // Raw events: show all events for the current overarching demo run
+            // Raw ledger ignores generations
             const runEvs = evs.filter(e => e.session_id && e.session_id.includes(demoRunId) || e.request_id && e.request_id.includes(demoRunId)).reverse();
             let html = '';
             runEvs.forEach(e => {
@@ -306,27 +419,18 @@
             });
             document.getElementById('c5-events').textContent = html || "No events.";
 
-            // Guard against stale asynchronous responses overwriting a newer scenario
-            if (fetchContextId !== activeExecutionId) return;
+            if (fetchGen !== activeScenarioState.generation) return;
 
-            // Summary: filter ONLY by requests exactly registered for the active execution
-            const scenarioEvs = evs.filter(e => e.request_id && activeScenarioRequests.has(e.request_id)).reverse();
+            const scenarioEvs = evs.filter(e => e.request_id && activeScenarioState.requestIds.has(e.request_id)).reverse();
             
             if (scenarioEvs.length > 0) {
-                // The most recent event belonging to the active scenario is our terminal state
                 const term = scenarioEvs[0];
-                document.getElementById('c5-cur-dec').textContent = term.decision;
-                document.getElementById('c5-cur-dec').className = 'info-value ' + (term.decision === 'ALLOW' || term.decision === 'PERMIT' ? 'pass' : 'fail');
-                
-                document.getElementById('c5-cur-stage').textContent = term.decision_stage;
-                document.getElementById('c5-cur-reason').textContent = term.reason;
-                
-                // Inspect the event chain to see if an ECC was issued
+                activeScenarioState.c5.decision = term.decision;
+                activeScenarioState.c5.stage = term.decision_stage;
+                activeScenarioState.c5.reason = term.reason;
                 const eccIssued = scenarioEvs.some(e => e.event_type === 'ECC_ISSUED');
-                document.getElementById('c5-cur-ecc').textContent = eccIssued ? 'ISSUED' : 'NOT ISSUED';
-                
-                // Determine system effect from architecture state if AcmeOps was reached
-                // (Set dynamically in runScenario during execution)
+                activeScenarioState.c5.ecc = eccIssued ? 'ISSUED' : 'NOT ISSUED';
+                renderState();
             }
         } catch(e) {}
     }
@@ -338,87 +442,43 @@
         document.getElementById('run-id').textContent = demoRunId;
         await fetch(API_CROA + '/reset', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({demo_run_id: demoRunId}) });
         await fetch(API_C6 + '/reset', { method: 'POST' });
-        resetUI(true);
-        document.getElementById('outcome-text').textContent = "Demo environment reset. Select a scenario.";
-        checkHealth();
-    }
-
-    function resetUI(fullReset = false) {
-        // Generate a new unique ID for every single scenario click
-        activeExecutionId = 'exec-' + generateId();
-        activeScenarioRequests.clear();
         
-        const nodes = ['agent', 'c3', 'c2', 'c4', 'c7', 'c6', 'acmeops'];
-        nodes.forEach(n => setNodeState(n, 'IDLE', ''));
-        document.getElementById('ecc-data').style.display = 'none';
-        document.getElementById('ecc-empty').style.display = 'block';
-        document.getElementById('system-effect').textContent = '-';
-        document.getElementById('system-effect').className = 'effect-value';
-        
-        // PENDING STATE
-        document.getElementById('c5-cur-dec').textContent = 'PENDING';
-        document.getElementById('c5-cur-dec').className = 'info-value';
-        document.getElementById('c5-cur-stage').textContent = 'PENDING';
-        document.getElementById('c5-cur-reason').textContent = 'PENDING';
-        document.getElementById('c5-cur-ecc').textContent = 'PENDING';
-        document.getElementById('c5-cur-eff').textContent = 'PENDING';
+        activeScenarioState.generation++;
+        activeScenarioState.requestIds.clear();
+        setNotReached(['agent', 'c3', 'c2', 'c4', 'c7', 'c6', 'acmeops']);
+        activeScenarioState.c5 = { decision: 'PENDING', stage: 'PENDING', reason: 'PENDING', ecc: 'PENDING', effect: 'PENDING' };
+        activeScenarioState.eccData = null;
+        activeScenarioState.outcome = "Demo environment reset. Select a scenario.";
+        activeScenarioState.systemEffectValue = '-';
+        activeScenarioState.systemEffectStyle = 'none';
         
         document.getElementById('special-vis').style.display = 'none';
         document.getElementById('special-vis').innerHTML = '';
-        document.getElementById('outcome-text').textContent = "Processing...";
-        
-        if (fullReset) {
-            document.getElementById('c5-events').textContent = 'No events.';
-        }
-    }
-
-    function setNodeState(node, state, type) {
-        const el = document.getElementById('node-' + node);
-        el.className = 'node ' + type;
-        el.querySelector('.node-state').textContent = state;
-    }
-    
-    function setNotReached(nodes) {
-        nodes.forEach(n => setNodeState(n, 'NOT REACHED', ''));
-    }
-
-    function decodeJWT(token) {
-        try {
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
-            return JSON.parse(jsonPayload);
-        } catch(e) { return null; }
-    }
-
-    function displayECC(ecc) {
-        if (!ecc) return;
-        document.getElementById('ecc-empty').style.display = 'none';
-        document.getElementById('ecc-data').style.display = 'block';
-        const payload = decodeJWT(ecc);
-        if (payload) {
-            document.getElementById('ecc-payload').textContent = JSON.stringify(payload, null, 2);
-            document.getElementById('ecc-ttl').textContent = payload.exp - payload.iat;
-            document.getElementById('ecc-hash').textContent = payload.parameters_hash;
-            document.getElementById('ecc-nonce').textContent = payload.nonce;
-            const now = Math.floor(Date.now() / 1000);
-            const drift = Math.abs(payload.iat - now);
-            const el = document.getElementById('ecc-clock-check');
-            if (drift < 60) { el.textContent = 'PASS'; el.className = 'info-value pass'; } 
-            else { el.textContent = 'FAIL'; el.className = 'info-value fail'; }
-        }
-    }
-    
-    function showOutcome(text) {
-        document.getElementById('outcome-text').textContent = text;
+        document.getElementById('c5-events').textContent = 'No events.';
+        renderState();
+        checkHealth();
     }
 
     // Orchestrator
     async function runScenario(type) {
-        resetUI();
-        setNodeState('agent', 'PROPOSED', 'pass');
+        // Full atomic reset
+        activeScenarioState.generation++;
+        const gen = activeScenarioState.generation;
+        const execId = 'exec-' + generateId();
+        
+        activeScenarioState.requestIds.clear();
+        setArch('agent', 'PROPOSED', 'pass');
+        setNotReached(['c3', 'c2', 'c4', 'c7', 'c6', 'acmeops']);
+        
+        activeScenarioState.c5 = { decision: 'PENDING', stage: 'PENDING', reason: 'PENDING', ecc: 'PENDING', effect: 'PENDING' };
+        activeScenarioState.eccData = null;
+        activeScenarioState.outcome = 'Evaluating...';
+        activeScenarioState.systemEffectValue = 'PENDING';
+        activeScenarioState.systemEffectStyle = 'none';
+        
+        document.getElementById('special-vis').style.display = 'none';
+        document.getElementById('special-vis').innerHTML = '';
+        renderState();
         
         let action = 'get_customer';
         let target = 'customer:342';
@@ -428,20 +488,23 @@
         if (type === 'C') { action = 'delete_environment'; target = 'environment:dev'; }
         if (type === 'D' || type === 'G') { action = 'export_customers'; target = 'endpoint:analytics.internal'; params = {count: 40}; }
         
-        const countBefore = await getAcmeOpsCount();
-
         const sessionId = 'sess-' + demoRunId + (type === 'D' ? '-D' : ''); 
-        
         let ecc = null;
+        
+        if (type === 'E' || type === 'F') {
+            activeScenarioState.requestIds.add('unknown');
+        }
         
         if (type !== 'E') { 
             if (type === 'D') {
                 for(let i=1; i<=2; i++) {
-                    let preReqId = activeExecutionId + '-pre' + i;
-                    activeScenarioRequests.add(preReqId);
+                    if (gen !== activeScenarioState.generation) return;
+                    let preReqId = execId + '-pre' + i;
+                    activeScenarioState.requestIds.add(preReqId);
                     let r = await fetch(API_CROA + '/propose', { method: 'POST', headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({request_id: preReqId, session_id: sessionId, subject: 'agent:1', action, target, parameters: params})});
                     let d = await r.json();
+                    if (gen !== activeScenarioState.generation) return;
                     if(d.ecc) {
                         await fetch(API_C6 + '/execute', { method: 'POST', headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ecc: d.ecc, subject: 'agent:1', action, target, parameters: params})});
@@ -449,30 +512,44 @@
                 }
             }
             
-            const reqId = activeExecutionId + '-main';
-            activeScenarioRequests.add(reqId);
+            if (gen !== activeScenarioState.generation) return;
+            const reqId = execId + '-main';
+            activeScenarioState.requestIds.add(reqId);
             
             const pRes = await fetch(API_CROA + '/propose', { method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({request_id: reqId, session_id: sessionId, subject: 'agent:1', action, target, parameters: params})});
             const pData = await pRes.json();
             
-            if (pData.decision_stage === 'C3') {
-                setNodeState('c3', 'DENY ✕', 'fail'); setNotReached(['c2', 'c4', 'c7', 'c6', 'acmeops']);
-                showOutcome("Unknown target rejected before authorization.");
-                finalizeProof('NONE', 'none'); return;
-            }
-            setNodeState('c3', 'GROUNDED ✓', 'pass');
+            if (gen !== activeScenarioState.generation) return;
             
-            if (pData.decision_stage === 'C2') {
-                setNodeState('c2', 'DENY ✕', 'fail'); setNotReached(['c4', 'c7', 'c6', 'acmeops']);
-                showOutcome("Policy denied the operation before execution.");
-                finalizeProof('NONE', 'none'); return;
-            }
-            setNodeState('c2', 'PASS ✓', 'pass');
+            // ROOT CAUSE FIX: Do not assume `decision_stage === 'C2'` means DENY.
+            // Check `decision === 'DENY'` explicitly.
             
-            if (pData.decision_stage === 'C4') {
-                setNodeState('c4', 'DENY ✕', 'fail'); setNotReached(['c7', 'c6', 'acmeops']);
-                showOutcome("Projected cumulative state exceeded the registered invariant. Execution prevented.");
+            if (pData.decision === 'DENY' && pData.decision_stage === 'C3') {
+                setArch('c3', 'DENY ✕', 'fail'); setNotReached(['c2', 'c4', 'c7', 'c6', 'acmeops']);
+                activeScenarioState.outcome = "Unknown target rejected before authorization.";
+                activeScenarioState.c5.effect = 'NONE';
+                activeScenarioState.systemEffectValue = 'NONE';
+                renderState();
+                await fetchEvidence();
+                return;
+            }
+            setArch('c3', 'GROUNDED ✓', 'pass');
+            
+            if (pData.decision === 'DENY' && pData.decision_stage === 'C2') {
+                setArch('c2', 'DENY ✕', 'fail'); setNotReached(['c4', 'c7', 'c6', 'acmeops']);
+                activeScenarioState.outcome = "Policy denied the operation before execution.";
+                activeScenarioState.c5.effect = 'NONE';
+                activeScenarioState.systemEffectValue = 'NONE';
+                renderState();
+                await fetchEvidence();
+                return;
+            }
+            setArch('c2', 'PASS ✓', 'pass');
+            
+            if (pData.decision === 'DENY' && pData.decision_stage === 'C4') {
+                setArch('c4', 'DENY ✕', 'fail'); setNotReached(['c7', 'c6', 'acmeops']);
+                activeScenarioState.outcome = "Projected cumulative state exceeded the registered invariant. Execution prevented.";
                 if (type === 'D') {
                     const sv = document.getElementById('special-vis');
                     sv.style.display = 'block';
@@ -483,19 +560,29 @@
                         <div class="special-vis-row" style="color:var(--error);font-weight:bold;"><span>REQ 3:</span><span>80 + 40 = 120 (DENIED)</span></div>
                         <div style="margin-top:8px; border-top:1px solid #dee2e6; padding-top:6px;">ACTUAL SYSTEM EFFECT: <b>80 records</b> (NOT 120)</div>
                     `;
+                    activeScenarioState.systemEffectValue = 'NONE (3rd Req) | 80 (Scenario)';
+                    activeScenarioState.systemEffectStyle = 'executed';
+                    activeScenarioState.c5.effect = 'NONE (3rd Req) | 80 (Scenario)';
+                } else {
+                    activeScenarioState.systemEffectValue = 'NONE';
+                    activeScenarioState.c5.effect = 'NONE';
                 }
-                finalizeProof('NONE', 'none'); return;
+                renderState();
+                await fetchEvidence();
+                return;
             }
-            setNodeState('c4', 'PASS ✓', 'pass');
-            setNodeState('c7', 'ECC ISSUED ✓', 'pass');
-            ecc = pData.ecc;
-            displayECC(ecc);
+            if (pData.decision === 'PERMIT') {
+                setArch('c4', 'PASS ✓', 'pass');
+                setArch('c7', 'ECC ISSUED ✓', 'pass');
+                ecc = pData.ecc;
+                activeScenarioState.eccData = ecc;
+            }
         } else {
             setNotReached(['c3', 'c2', 'c4', 'c7']);
-            // Add a synthetic request ID for E so it can be tracked if it emits C6 events
-            activeScenarioRequests.add(activeExecutionId + '-main');
         }
 
+        if (gen !== activeScenarioState.generation) return;
+        
         if (type === 'F') ecc = ecc + '.forged';
         let execParams = params;
         if (type === 'G') {
@@ -518,29 +605,36 @@
         const xRes = await fetch(API_C6 + '/execute', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(xReq)});
         const xData = await xRes.json();
         
+        if (gen !== activeScenarioState.generation) return;
+        
         if (xData.decision === 'ALLOW') {
-            setNodeState('c6', 'ALLOW ✓', 'pass');
-            setNodeState('acmeops', 'EXECUTED ✓', 'pass');
-            showOutcome("Authorized operation executed through the governed boundary.");
-            finalizeProof('EXECUTED', 'executed');
+            setArch('c6', 'ALLOW ✓', 'pass');
+            setArch('acmeops', 'EXECUTED ✓', 'pass');
+            activeScenarioState.outcome = "Authorized operation executed through the governed boundary.";
+            activeScenarioState.c5.effect = 'EXECUTED';
+            activeScenarioState.systemEffectValue = 'EXECUTED';
+            activeScenarioState.systemEffectStyle = 'executed';
         } else {
-            setNodeState('c6', 'BLOCK ✕', 'fail');
-            setNodeState('acmeops', 'NOT REACHED', '');
+            setArch('c6', 'BLOCK ✕', 'fail');
+            setArch('acmeops', 'NOT REACHED', '');
             
-            if (type === 'E') showOutcome("Execution request had no authorization commitment. Boundary crossing blocked.");
-            else if (type === 'F') showOutcome("Authorization signature invalid. Boundary crossing blocked.");
-            else if (type === 'G') showOutcome("Execution differed from the authorized commitment. Boundary crossing blocked.");
-            else showOutcome("Operation blocked at firewall: " + xData.reason);
+            if (type === 'E') activeScenarioState.outcome = "Execution request had no authorization commitment. Boundary crossing blocked.";
+            else if (type === 'F') activeScenarioState.outcome = "Authorization signature invalid. Boundary crossing blocked.";
+            else if (type === 'G') activeScenarioState.outcome = "Execution differed from the authorized commitment. Boundary crossing blocked.";
+            else activeScenarioState.outcome = "Operation blocked at firewall: " + xData.reason;
             
-            finalizeProof('NONE', 'none');
+            activeScenarioState.c5.effect = 'NONE';
+            activeScenarioState.systemEffectValue = 'NONE';
         }
         
         if (type === 'H') {
             const xRes2 = await fetch(API_C6 + '/execute', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(xReq)});
             const xData2 = await xRes2.json();
-            setNodeState('c6', 'BLOCK ✕', 'fail');
-            setNodeState('acmeops', 'NOT REACHED', '');
-            showOutcome("Authorization commitment had already been redeemed. Replay prevented.");
+            if (gen !== activeScenarioState.generation) return;
+            
+            setArch('c6', 'BLOCK ✕', 'fail');
+            setArch('acmeops', 'NOT REACHED', '');
+            activeScenarioState.outcome = "Authorization commitment had already been redeemed. Replay prevented.";
             
             const sv = document.getElementById('special-vis');
             sv.style.display = 'block';
@@ -550,24 +644,18 @@
                 <div class="special-vis-row"><span>2nd REDEMPTION:</span><span style="color:var(--error);">BLOCKED (SAME ECC)</span></div>
                 <div style="margin-top:8px; border-top:1px solid #dee2e6; padding-top:6px;">AcmeOps executions: <b>1</b></div>
             `;
-            finalizeProof('EXECUTED 1', 'executed');
+            activeScenarioState.c5.effect = 'EXECUTED 1';
+            activeScenarioState.systemEffectValue = 'EXECUTED 1';
+            activeScenarioState.systemEffectStyle = 'executed';
         }
-    }
-    
-    async function finalizeProof(effectTxt, style) {
-        const effectEl = document.getElementById('system-effect');
-        effectEl.textContent = effectTxt;
-        effectEl.className = 'effect-value ' + style;
         
-        const curEff = document.getElementById('c5-cur-eff');
-        curEff.textContent = effectTxt;
-        curEff.className = 'info-value ' + style;
-        
-        fetchEvidence();
+        renderState();
+        await fetchEvidence();
     }
 
     checkHealth();
     resetDemo();
+    setInterval(fetchEvidence, 1500);
 </script>
 </body>
 </html>
