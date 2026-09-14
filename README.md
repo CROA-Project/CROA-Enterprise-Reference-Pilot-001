@@ -2,7 +2,7 @@
 
 ## Purpose
 Build a small, fully local, reproducible enterprise-style demonstration of the **Constrained Reachability Orchestration Architecture (CROA)**. 
-The objective is to demonstrate that an AI agent may propose actions, but execution authority remains completely outside the agent. This pilot proves that legitimate actions are permitted, prohibited actions are denied, cumulative trajectories are enforced *before* execution, and that operations cannot execute without a cryptographically valid Execution Change Contract (ECC).
+The objective is to demonstrate that an AI agent may propose actions, but execution authority remains completely outside the agent. This pilot demonstrates, within its modeled scenarios and documented trust assumptions, that legitimate actions are permitted, prohibited actions are denied, cumulative trajectories are enforced *before* execution, and that operations cannot execute without a cryptographically valid Execution Change Contract (ECC).
 
 ## Architecture
 The pilot consists of four distinct containers simulating enterprise boundaries:

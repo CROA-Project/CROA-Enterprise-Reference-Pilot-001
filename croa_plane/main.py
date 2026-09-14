@@ -75,7 +75,6 @@ def health_check():
 class C5ControlRequest(BaseModel):
     unavailable: bool
 
-print("IS_TEST:", os.environ.get("ENABLE_TEST_MODE", "0") == "1")
 if os.environ.get("ENABLE_TEST_MODE", "0") == "1":
     @app.post("/demo-control/c5-fail", dependencies=[Depends(verify_demo_control)])
     def toggle_c5(req: C5ControlRequest):
