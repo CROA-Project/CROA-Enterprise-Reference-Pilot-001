@@ -14,14 +14,18 @@ The pilot consists of four distinct containers simulating enterprise boundaries:
 *Note: C1, C2, C3, C4, C5, and C7 are co-located in one pilot container for implementation simplicity. This is a pilot deployment choice, not a CROA architectural requirement.*
 
 ## Quick Start
-From a clean local environment, simply run:
+1. Copy `.env.example` to `.env` and replace placeholder values.
+2. Generate pilot keys locally:
 ```bash
 python scripts/generate_pilot_keys.py
-docker compose build
-docker compose up -d
 ```
-Then navigate your browser to:
-[http://localhost:8080](http://localhost:8080)
+3. Build and start the architecture:
+```bash
+docker compose up --build -d
+```
+4. Open the UI: [http://localhost:8080](http://localhost:8080)
+
+*Note: For demo-control functions (e.g. resetting evidence), the browser will prompt you for the DEMO_CONTROL_SECRET configured in your `.env` file. This represents a strictly local pilot capability, not a production security boundary.*
 
 ## Demo Scenarios
 The UI provides 8 pre-configured scenarios that interact directly with the live pilot containers:
@@ -75,25 +79,26 @@ In the UI, click **Reset Demo**. This will:
 4. Log a `DEMO_RESET` event to the `evidence_data/evidence.jsonl` log to maintain audibility of the reset operation.
 
 ## How to Run Tests
-The automated test scripts are stored in the 	ests/ directory. They can be executed by piping them directly into the Python environment of the c6_firewall container, which has the correct network resolution.
+The automated test scripts are stored in the `tests/` directory. They can be executed by piping them directly into the Python environment of the containers, which have the correct network resolution.
 
 ### Normal Runtime Tests
 These tests assert behavior in the standard environment:
-`ash
+```bash
 # Phase 5 Automated UI Scenarios
 cat tests/test_phase5.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
 
 # Hardening / Adversarial Scenarios
-cat tests/test_hardening.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
+cat tests/test_hardening.py | docker exec -i croa-pilot-001-croa_plane-1 python -
 
 # Prove TTL manipulation is blocked
 cat tests/test_ttl_enforcement.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
-`
+```
 
 ### Test Mode Execution
 To run tests that require internal clock/TTL overrides (like the expiration test), you must explicitly restart the plane in test mode:
-`ash
+```bash
 docker compose -f docker-compose.yml -f docker-compose.test.yml up -d
 cat tests/test_phase4.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
-docker compose up -d # Reverts to normal mode
-`
+docker compose down
+docker compose up -d
+```

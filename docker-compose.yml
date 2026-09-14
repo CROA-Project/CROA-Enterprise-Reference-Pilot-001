@@ -20,8 +20,8 @@ services:
     volumes:
       - ./evidence_data:/app/evidence_data
     environment:
-      - DEMO_CONTROL_SECRET=\
-      - INTERNAL_SERVICE_SECRET=\
+      - DEMO_CONTROL_SECRET
+      - INTERNAL_SERVICE_SECRET
 
   c6_firewall:
     build: ./c6_firewall
@@ -31,8 +31,8 @@ services:
       - edge_network
       - governed_network
     environment:
-      - DEMO_CONTROL_SECRET=\
-      - INTERNAL_SERVICE_SECRET=\
+      - DEMO_CONTROL_SECRET
+      - INTERNAL_SERVICE_SECRET
 
   acmeops_api:
     build: ./acmeops_api

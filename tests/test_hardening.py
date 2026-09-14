@@ -1,10 +1,11 @@
 ﻿import httpx
-import json\nimport os
+import json
+import os
 import uuid
 import time
 import jwt
 
-CROA_URL = "http://croa_plane:8000"
+CROA_URL = "http://localhost:8000"
 C6_URL = "http://c6_firewall:8000"
 
 def print_result(name, passed):
@@ -121,7 +122,58 @@ def test_ttl_control():
     print_result("TEST-G: Caller cannot control TTL", diff == 300)
 
 def test_malformed_ecc():
-    print_result("TEST-H/I: Malformed ECC", True)
+    h_before = len(httpx.get(f"{C6_URL}/acmeops/history", headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]}).json())
+    # A. missing nonce
+    # Generate a valid token without nonce
+    import jwt
+    with open('private.pem', 'rb') as kf:
+        private_key = kf.read()
+    
+    payload_a = {
+        "ecc_id": str(uuid.uuid4()),
+        "request_id": "malformed-1",
+        "session_id": "sess-malformed",
+        "subject": "agent:1",
+        "action": "get_customer",
+        "target": "customer:342",
+        "parameters_hash": "dummy",
+        "invariant_set_version": "pilot-policy-set-v1",
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 300
+    }
+    ecc_a = jwt.encode(payload_a, private_key, algorithm="RS256")
+    
+    r_a = httpx.post(f"{C6_URL}/execute", json={
+        "ecc": ecc_a,
+        "subject": "agent:1",
+        "action": "get_customer",
+        "target": "customer:342",
+        "parameters": {}
+    })
+    
+    if r_a.json().get("decision") == "BLOCK" and r_a.json().get("reason") == "MALFORMED_ECC" and len(httpx.get(f"{C6_URL}/acmeops/history", headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]}).json()) == h_before:
+        pass
+    else:
+        print_result("TEST-H/I: Malformed ECC", False, f"Missing nonce failed: {r_a.json()}")
+        return
+        
+    payload_b = payload_a.copy()
+    payload_b["nonce"] = str(uuid.uuid4())
+    del payload_b["ecc_id"]
+    ecc_b = jwt.encode(payload_b, private_key, algorithm="RS256")
+    
+    r_b = httpx.post(f"{C6_URL}/execute", json={
+        "ecc": ecc_b,
+        "subject": "agent:1",
+        "action": "get_customer",
+        "target": "customer:342",
+        "parameters": {}
+    })
+    
+    if r_b.json().get("decision") == "BLOCK" and r_b.json().get("reason") == "MALFORMED_ECC" and len(httpx.get(f"{C6_URL}/acmeops/history", headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]}).json()) == h_before:
+        print_result("TEST-H/I: Malformed ECC", True)
+    else:
+        print_result("TEST-H/I: Malformed ECC", False, f"Missing ecc_id failed: {r_b.json()}")
 
 def test_concurrency():
     import threading

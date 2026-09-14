@@ -1,5 +1,6 @@
 import httpx
-import json\nimport os
+import json
+import os
 import time
 
 CROA_URL = "http://croa_plane:8000"

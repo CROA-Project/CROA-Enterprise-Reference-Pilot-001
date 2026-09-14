@@ -174,8 +174,6 @@ def propose_action(req: ProposeRequest):
         
     if c2_result["decision"] == "PERMIT":
         ttl = req.expiry_seconds if (req.expiry_seconds is not None and int(os.environ.get('ENABLE_TEST_MODE', '0')) == 1) else int(os.environ.get('ECC_TTL_SECONDS', 300))
-        with open('/app/ttl_debug.txt', 'w') as f_debug:
-            f_debug.write(f'req.expiry_seconds={req.expiry_seconds} TEST_MODE={os.environ.get("ENABLE_TEST_MODE")} ttl={ttl}')
         
         ecc_data = generate_ecc(
             request_id=req.request_id, session_id=req.session_id, subject=req.subject,
