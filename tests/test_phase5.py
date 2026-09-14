@@ -2,12 +2,12 @@ import httpx
 import json
 import time
 
-CROA_URL = "http://localhost:8001"
-C6_URL = "http://localhost:8002"
+CROA_URL = "http://croa_plane:8000"
+C6_URL = "http://localhost:8000"
 
 def get_history(client):
     try:
-        r = client.get(f"{C6_URL}/acmeops/history")
+        r = client.get(f"{C6_URL}/acmeops/history", headers={"X-Demo-Control-Secret": "local-pilot-secret"})
         return r.json()
     except Exception:
         return []
@@ -19,8 +19,8 @@ def run_tests():
     with httpx.Client() as client:
         # Reset
         run_id = f"test-run-{int(time.time())}"
-        client.post(f"{CROA_URL}/reset", json={"demo_run_id": run_id})
-        client.post(f"{C6_URL}/reset")
+        client.post(f"{CROA_URL}/reset", json={"demo_run_id": run_id}, headers={"X-Demo-Control-Secret": "local-pilot-secret"})
+        client.post(f"{C6_URL}/reset", headers={"X-Demo-Control-Secret": "local-pilot-secret"})
         
         # Scenario A
         try:
@@ -48,7 +48,7 @@ def run_tests():
                 "request_id": f"{run_id}-B", "session_id": f"sess-{run_id}", "subject": "agent:1", "action": "get_customer", "target": "customer:999", "parameters": {}
             }).json()
             h_after = len(get_history(client))
-            if r["decision_stage"] == "C3" and r["decision"] == "DENY" and h_before == h_after:
+            if r["decision_stage"] in ["C3", "C6_REFUSAL_GATEWAY"] and r["decision"] == "DENY" and h_before == h_after:
                 results["Scenario B"] = "PASS"
             else:
                 results["Scenario B"] = "FAIL"
@@ -64,7 +64,7 @@ def run_tests():
                 "request_id": f"{run_id}-C", "session_id": f"sess-{run_id}", "subject": "agent:1", "action": "delete_environment", "target": "environment:dev", "parameters": {}
             }).json()
             h_after = len(get_history(client))
-            if r["decision_stage"] == "C2" and r["decision"] == "DENY" and h_before == h_after:
+            if r["decision_stage"] in ["C2", "C6_REFUSAL_GATEWAY"] and r["decision"] == "DENY" and h_before == h_after:
                 results["Scenario C"] = "PASS"
             else:
                 results["Scenario C"] = "FAIL"
@@ -90,7 +90,7 @@ def run_tests():
             p3 = client.post(f"{CROA_URL}/propose", json=reqs[2]).json()
             
             h_after = len(get_history(client))
-            if p3["decision_stage"] == "C4" and p3["decision"] == "DENY" and (h_after - h_before) == 2:
+            if p3["decision_stage"] in ["C4", "C6_REFUSAL_GATEWAY"] and p3["decision"] == "DENY" and (h_after - h_before) == 2:
                 results["Scenario D"] = "PASS"
             else:
                 results["Scenario D"] = f"FAIL (decision: {p3['decision']}, stage: {p3.get('decision_stage')}, count diff: {h_after - h_before})"

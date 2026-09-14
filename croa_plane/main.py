@@ -1,10 +1,12 @@
-from fastapi import FastAPI, HTTPException
+﻿from fastapi import FastAPI, HTTPException, Header, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 import json
 import hashlib
 from datetime import datetime
+import os
+import httpx
 
 from c3_resolver import resolve_target
 from c2_governor import evaluate_request
@@ -16,11 +18,23 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+DEMO_CONTROL_SECRET = os.environ.get("DEMO_CONTROL_SECRET", "local-pilot-secret")
+INTERNAL_SERVICE_SECRET = os.environ.get("INTERNAL_SERVICE_SECRET", "local-internal-secret")
+C6_URL = "http://c6_firewall:8000"
+
+def verify_demo_control(x_demo_control_secret: str = Header(None)):
+    if x_demo_control_secret != DEMO_CONTROL_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid demo control secret")
+
+def verify_internal_service(x_internal_service_secret: str = Header(None)):
+    if x_internal_service_secret != INTERNAL_SERVICE_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid internal service secret")
 
 class ProposeRequest(BaseModel):
     request_id: str
@@ -29,7 +43,7 @@ class ProposeRequest(BaseModel):
     action: str
     target: str
     parameters: Optional[Dict[str, Any]] = {}
-    expiry_seconds: Optional[int] = 300 # for testing
+    expiry_seconds: Optional[int] = None
 
 class EvidenceRequest(BaseModel):
     request_id: str
@@ -53,7 +67,7 @@ class ResetRequest(BaseModel):
 def health_check():
     return {"status": "ONLINE"}
 
-@app.post("/reset")
+@app.post("/reset", dependencies=[Depends(verify_demo_control)])
 def reset_demo(req: ResetRequest):
     trajectory_state.clear()
     record_event(
@@ -69,7 +83,7 @@ def reset_demo(req: ResetRequest):
     )
     return {"status": "reset", "demo_run_id": req.demo_run_id}
 
-@app.get("/evidence")
+@app.get("/evidence", dependencies=[Depends(verify_demo_control)])
 def get_evidence():
     events = []
     try:
@@ -80,7 +94,7 @@ def get_evidence():
         pass
     return events
 
-@app.get("/evidence/verify")
+@app.get("/evidence/verify", dependencies=[Depends(verify_demo_control)])
 def verify_evidence():
     prev = "0000000000000000000000000000000000000000000000000000000000000000"
     try:
@@ -98,7 +112,7 @@ def verify_evidence():
         pass
     return {"valid": True}
 
-@app.post("/evidence")
+@app.post("/evidence", dependencies=[Depends(verify_internal_service)])
 def post_evidence(ev: EvidenceRequest):
     record_event(
         request_id=ev.request_id,
@@ -117,6 +131,20 @@ def post_evidence(ev: EvidenceRequest):
     )
     return {"status": "ok"}
 
+def forward_to_c6_refusal_gateway(deny_payload: dict) -> dict:
+    try:
+        with httpx.Client() as client:
+            resp = client.post(
+                f"{C6_URL}/refuse",
+                json=deny_payload,
+                headers={"X-Internal-Service-Secret": INTERNAL_SERVICE_SECRET}
+            )
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        pass
+    return deny_payload
+
 @app.post("/propose")
 def propose_action(req: ProposeRequest):
     timestamp = datetime.utcnow().isoformat() + "Z"
@@ -125,21 +153,30 @@ def propose_action(req: ProposeRequest):
     if not is_grounded:
         record_event(req.request_id, req.session_id, req.subject, req.action, req.target, 
                      "GROUNDING_FAILED", "DENY", grounding_reason, "C3", None, "pilot-policy-set-v1")
-        return {
-            "request_id": req.request_id, "subject": req.subject, "action": req.action, "target": req.target,
+        deny_payload = {
+            "request_id": req.request_id, "session_id": req.session_id, "subject": req.subject, "action": req.action, "target": req.target,
             "decision": "DENY", "reason": grounding_reason, "decision_stage": "C3", "policy_id": None, "invariant_set_version": "pilot-policy-set-v1", "timestamp": timestamp
         }
+        return forward_to_c6_refusal_gateway(deny_payload)
         
     record_event(req.request_id, req.session_id, req.subject, req.action, req.target, 
                  "GROUNDING_PASSED", "PERMIT", "TARGET_GROUNDED", "C3", None, "pilot-policy-set-v1")
         
     c2_result = evaluate_request(req.dict())
     
+    if c2_result["decision"] == "DENY":
+        c2_result["session_id"] = req.session_id
+        return forward_to_c6_refusal_gateway(c2_result)
+        
     if c2_result["decision"] == "PERMIT":
+        ttl = req.expiry_seconds if (req.expiry_seconds is not None and int(os.environ.get('ENABLE_TEST_MODE', '0')) == 1) else int(os.environ.get('ECC_TTL_SECONDS', 300))
+        with open('/app/ttl_debug.txt', 'w') as f_debug:
+            f_debug.write(f'req.expiry_seconds={req.expiry_seconds} TEST_MODE={os.environ.get("ENABLE_TEST_MODE")} ttl={ttl}')
+        
         ecc_data = generate_ecc(
             request_id=req.request_id, session_id=req.session_id, subject=req.subject,
             action=req.action, target=req.target, parameters=req.parameters,
-            invariant_set_version=c2_result["invariant_set_version"], expiry_seconds=req.expiry_seconds
+            invariant_set_version=c2_result["invariant_set_version"], expiry_seconds=ttl
         )
         record_event(
             req.request_id, req.session_id, req.subject, req.action, req.target,

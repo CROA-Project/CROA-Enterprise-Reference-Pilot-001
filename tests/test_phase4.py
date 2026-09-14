@@ -7,7 +7,7 @@ C6_URL = "http://localhost:8000/execute" # When run in c6 container, it will hit
 ACMEOPS_HISTORY_URL = "http://acmeops_api:8000/internal/history"
 
 def get_acmeops_history(client):
-    resp = client.get(ACMEOPS_HISTORY_URL)
+    resp = client.get(ACMEOPS_HISTORY_URL, headers={"X-Demo-Control-Secret": "local-pilot-secret"})
     return resp.json()
 
 def run_tests():
@@ -171,7 +171,7 @@ def run_tests():
 
         # TEST-ECC-09 Expired ECC
         try:
-            resp = client.post("http://croa_plane:8000/propose", json={
+            resp = client.post("http://croa_plane:8000/propose", headers={"X-Test-Expiry-Seconds": "1"}, json={
                 "request_id": "req-ecc-exp", "session_id": "s-ecc-$((Get-Date).Ticks)", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}, "expiry_seconds": 1
             })
             exp_ecc = resp.json().get("ecc")

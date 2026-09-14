@@ -1,4 +1,4 @@
-version: '3.8'
+﻿version: '3.8'
 
 services:
   ui:
@@ -13,6 +13,8 @@ services:
 
   croa_plane:
     build: ./croa_plane
+    environment:
+      - ENABLE_TEST_MODE=1
     ports:
       - "8001:8000"
     networks:

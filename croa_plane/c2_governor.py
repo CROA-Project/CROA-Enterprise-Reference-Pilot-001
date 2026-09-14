@@ -1,4 +1,4 @@
-from typing import Dict, Any
+﻿from typing import Dict, Any
 from datetime import datetime
 from c1_policy import evaluate_policy, INVARIANT_SET_VERSION
 from c4_trajectory import evaluate_trajectory, commit_trajectory
@@ -23,7 +23,6 @@ def evaluate_request(request_data: Dict[str, Any]) -> Dict[str, Any]:
         record_event(req_id, session_id, subject, action, target, "DENY", "DENY", "POLICY_DENIED", "C2", policy_match["policy_id"], INVARIANT_SET_VERSION)
         return {"request_id": req_id, "subject": subject, "action": action, "target": target, "decision": "DENY", "reason": "POLICY_DENIED", "decision_stage": "C2", "policy_id": policy_match["policy_id"], "invariant_set_version": INVARIANT_SET_VERSION, "timestamp": timestamp}
         
-    # Static allowed, now evaluate trajectory
     c4_decision, c4_data = evaluate_trajectory(session_id, subject, action, parameters)
     
     if c4_decision == "DENY":
@@ -32,21 +31,17 @@ def evaluate_request(request_data: Dict[str, Any]) -> Dict[str, Any]:
             record_event(req_id, session_id, subject, action, target, "DENY", "DENY", reason, "C4", policy_match["policy_id"], INVARIANT_SET_VERSION)
             return {"request_id": req_id, "subject": subject, "action": action, "target": target, "decision": "DENY", "reason": reason, "decision_stage": "C4", "policy_id": policy_match["policy_id"], "invariant_set_version": INVARIANT_SET_VERSION, "timestamp": timestamp}
         else:
-            # TRAJECTORY_ALERT
             record_event(req_id, session_id, subject, action, target, "TRAJECTORY_ALERT", "DENY", reason, "C4", policy_match["policy_id"], INVARIANT_SET_VERSION, c4_data)
-            # DENY
             record_event(req_id, session_id, subject, action, target, "DENY", "DENY", reason, "C4", policy_match["policy_id"], INVARIANT_SET_VERSION, c4_data)
             resp = {"request_id": req_id, "subject": subject, "action": action, "target": target, "decision": "DENY", "reason": reason, "decision_stage": "C4", "policy_id": policy_match["policy_id"], "invariant_set_version": INVARIANT_SET_VERSION, "timestamp": timestamp}
-            # Append C4 data to response for assertions
             for k, v in c4_data.items():
                 resp[k] = v
             return resp
             
     if c4_data:
-        commit_trajectory(session_id, c4_data["invariant_id"], c4_data["requested_increment"])
+        commit_trajectory(session_id, subject, c4_data["invariant_id"], c4_data["requested_increment"])
         record_event(req_id, session_id, subject, action, target, "TRAJECTORY_CHECK", "PERMIT", "TRAJECTORY_ALLOWED", "C4", policy_match["policy_id"], INVARIANT_SET_VERSION, c4_data)
 
-    # Final C2 PERMIT
     record_event(req_id, session_id, subject, action, target, "PERMIT", "PERMIT", "POLICY_ALLOWED", "C2", policy_match["policy_id"], INVARIANT_SET_VERSION)
     
     resp = {"request_id": req_id, "subject": subject, "action": action, "target": target, "decision": "PERMIT", "reason": "POLICY_ALLOWED", "decision_stage": "C2", "policy_id": policy_match["policy_id"], "invariant_set_version": INVARIANT_SET_VERSION, "timestamp": timestamp}

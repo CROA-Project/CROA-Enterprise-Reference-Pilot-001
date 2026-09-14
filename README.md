@@ -36,18 +36,22 @@ The UI provides 8 pre-configured scenarios that interact directly with the live 
 
 ## What the Pilot Demonstrates
 - Agent proposals are decoupled from execution.
-- Only a mathematically proven, unexpired, single-use Execution Change Contract (ECC) can breach the firewall.
+- Within the pilot's modeled scenarios and trust assumptions, C6 admits only operations carrying a valid, unexpired and unredeemed ECC whose signed commitment matches the requested operation.
 - Trajectory constraints (e.g. rate limits) are checked protectively on the control plane, preventing the generation of an ECC that would breach limits.
 - The C6 execution firewall is strictly stateless (except for replay caches) and does not rely on calling the control plane to make enforcement decisions.
 - A cryptographic tamper-evident C5 evidence hash chain logs all critical decisions.
 
 ## What the Pilot Does NOT Demonstrate
 This is an author-operated reference pilot. It is not:
-- An independent validation.
-- Formal verification of the architecture.
-- Production certification.
-- Proof of distributed concurrency safety.
-- Proof of cross-agent trajectory safety.
+- C1 is a static pilot realization of policy content, not full signed-policy lifecycle.
+- Agent Surface / AuthN / AQL are out of scope.
+- Subject binding is not identity authentication.
+- C5 is tamper-evident, not immutable.
+- C5 provenance is protected in the pilot by internal service authentication.
+- Replay cache is in-memory, single-node only.
+- C4 commit-at-permit simplification.
+- Cross-agent distributed trajectory safety is not demonstrated.
+- Distributed concurrency safety is not demonstrated.
 
 ## Security Model
 - **Network Isolation**: `acmeops_api` is on an internal docker network and publishes no ports. It cannot be reached directly by the UI or the `croa_plane`. Only `c6_firewall` has dual-network membership.
@@ -56,6 +60,7 @@ This is an author-operated reference pilot. It is not:
 
 ## Known Limitations
 - The C5 hash chain is a simplified local JSONL implementation.
+- Pilot simplification: trajectory budget is reserved/committed at permit time rather than target commit time. As a result, unused ECCs may still consume trajectory budget.
 - Replay protection (Nonces) are currently kept in memory within C6; production would require distributed caching (e.g., Redis).
 - Live LLM dependencies are omitted in favor of predetermined demonstration payloads.
 
