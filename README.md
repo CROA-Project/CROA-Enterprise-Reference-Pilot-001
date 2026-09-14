@@ -29,14 +29,14 @@ docker compose up --build -d
 
 ## Demo Scenarios
 The UI provides 8 pre-configured scenarios that interact directly with the live pilot containers:
-- **A â€” Legitimate Action**: Normal operation generating a valid ECC and executing.
-- **B â€” Unknown Target**: Fails at C3 context grounding (resource not registered).
-- **C â€” Forbidden Action**: Fails at C2 static policy check.
-- **D â€” Cumulative Trajectory**: Attempting 3 exports of 40 records under a 100-record session limit. The third request is blocked by C4 *before* an ECC is issued.
-- **E â€” Missing ECC**: Direct call to C6 without a contract is blocked.
-- **F â€” Forged ECC**: Invalidly signed contract is blocked by C6.
-- **G â€” Mutated Operation**: ECC issued for 40 records, but C6 is asked to execute 400. Blocked by payload binding mismatch.
-- **H â€” Replay Attempt**: Re-submitting an already redeemed valid ECC is blocked.
+- **A — Legitimate Action**: Normal operation generating a valid ECC and executing.
+- **B — Unknown Target**: Fails at C3 context grounding (resource not registered).
+- **C — Forbidden Action**: Fails at C2 static policy check.
+- **D — Cumulative Trajectory**: Attempting 3 exports of 40 records under a 100-record session limit. The third request is blocked by C4 *before* an ECC is issued.
+- **E — Missing ECC**: Direct call to C6 without a contract is blocked.
+- **F — Forged ECC**: Invalidly signed contract is blocked by C6.
+- **G — Mutated Operation**: ECC issued for 40 records, but C6 is asked to execute 400. Blocked by payload binding mismatch.
+- **H — Replay Attempt**: Re-submitting an already redeemed valid ECC is blocked.
 
 ## What the Pilot Demonstrates
 - Agent proposals are decoupled from execution.

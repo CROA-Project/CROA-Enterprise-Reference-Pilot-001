@@ -15,6 +15,7 @@ from c7_compiler import generate_ecc
 from c4_trajectory import trajectory_state
 
 app = FastAPI()
+_test_c5_unavailable = False
 
 app.add_middleware(
     CORSMiddleware,
@@ -71,6 +72,17 @@ class ResetRequest(BaseModel):
 def health_check():
     return {"status": "ONLINE"}
 
+class C5ControlRequest(BaseModel):
+    unavailable: bool
+
+print("IS_TEST:", os.environ.get("ENABLE_TEST_MODE", "0") == "1")
+if os.environ.get("ENABLE_TEST_MODE", "0") == "1":
+    @app.post("/demo-control/c5-fail", dependencies=[Depends(verify_demo_control)])
+    def toggle_c5(req: C5ControlRequest):
+        global _test_c5_unavailable
+        _test_c5_unavailable = req.unavailable
+        return {"status": "ok"}
+
 @app.post("/reset", dependencies=[Depends(verify_demo_control)])
 def reset_demo(req: ResetRequest):
     trajectory_state.clear()
@@ -118,6 +130,8 @@ def verify_evidence():
 
 @app.post("/evidence", dependencies=[Depends(verify_internal_service)])
 def post_evidence(ev: EvidenceRequest):
+    if _test_c5_unavailable:
+        raise HTTPException(status_code=503, detail="Simulated C5 Unavailable")
     record_event(
         request_id=ev.request_id,
         session_id=ev.session_id,

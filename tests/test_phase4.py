@@ -34,7 +34,7 @@ def run_tests():
             if c6_data.get("decision") == "ALLOW" and h_after == h_before + 1:
                 results["TEST-ECC-01"] = "PASS"
             else:
-                results["TEST-ECC-01"] = f"FAIL (C6: {c6_data.get('decision')}, History diff: {h_after - h_before})"
+                results["TEST-ECC-01"] = f"FAIL (C6: {c6_data.get('decision')}, reason: {c6_data.get('reason')}, History diff: {h_after - h_before})"
                 passed_all = False
         except Exception as e:
             results["TEST-ECC-01"] = f"FAIL ({e})"

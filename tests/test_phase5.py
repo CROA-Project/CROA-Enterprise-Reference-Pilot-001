@@ -4,7 +4,7 @@ import os
 import time
 
 CROA_URL = "http://croa_plane:8000"
-C6_URL = "http://localhost:8000"
+C6_URL = "http://c6_firewall:8000"
 
 def get_history(client):
     try:
@@ -39,7 +39,8 @@ def run_tests():
                 results["Scenario A"] = "FAIL"
                 passed_all = False
         except Exception as e:
-            results["Scenario A"] = f"FAIL ({e})"
+            import traceback
+            results["Scenario A"] = f"FAIL (x={x})"
             passed_all = False
             
         # Scenario B
@@ -97,7 +98,8 @@ def run_tests():
                 results["Scenario D"] = f"FAIL (decision: {p3['decision']}, stage: {p3.get('decision_stage')}, count diff: {h_after - h_before})"
                 passed_all = False
         except Exception as e:
-            results["Scenario D"] = f"FAIL ({e})"
+            import traceback
+            results["Scenario D"] = f"FAIL ({traceback.format_exc()})"
             passed_all = False
             
         # Scenario E
@@ -113,7 +115,8 @@ def run_tests():
                 results["Scenario E"] = "FAIL"
                 passed_all = False
         except Exception as e:
-            results["Scenario E"] = f"FAIL ({e})"
+            import traceback
+            results["Scenario E"] = f"FAIL (x={x})"
             passed_all = False
 
         # Scenario F
