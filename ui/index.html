@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -254,6 +254,7 @@
     const API_CROA = 'http://localhost:8001';
     const API_C6 = 'http://localhost:8002';
     let demoRunId = 'init';
+    let demoSecret = sessionStorage.getItem('demoSecret');
     
     // Canonical Active Scenario State
     let activeScenarioState = {
@@ -269,15 +270,15 @@
             acmeops: { state: 'IDLE', type: '' }
         },
         c5: {
-            decision: 'PENDING',
-            stage: 'PENDING',
-            reason: 'PENDING',
-            ecc: 'PENDING',
-            effect: 'PENDING'
+            decision: '-',
+            stage: '-',
+            reason: '-',
+            ecc: '-',
+            effect: '-'
         },
         eccData: null,
-        outcome: 'Evaluating...',
-        systemEffectValue: 'PENDING',
+        outcome: 'Select a scenario to begin demonstration.',
+        systemEffectValue: '-',
         systemEffectStyle: 'none'
     };
     
@@ -438,15 +439,32 @@
     function generateId() { return Math.floor(Date.now() / 1000).toString(); }
 
     async function resetDemo() {
+        if (!demoSecret) {
+            demoSecret = prompt("Enter DEMO_CONTROL_SECRET configured in your .env file:") || "";
+            if (!demoSecret) return;
+            sessionStorage.setItem('demoSecret', demoSecret);
+        }
+
         demoRunId = 'run-' + generateId();
         document.getElementById('run-id').textContent = demoRunId;
-        await fetch(API_CROA + '/reset', { method: 'POST', headers: {'Content-Type': 'application/json', 'X-Demo-Control-Secret': demoSecret}, body: JSON.stringify({demo_run_id: demoRunId}) });
-        await fetch(API_C6 + '/reset', { method: 'POST', headers: {'X-Demo-Control-Secret': demoSecret} });
+        
+        try {
+            const r1 = await fetch(API_CROA + '/reset', { method: 'POST', headers: {'Content-Type': 'application/json', 'X-Demo-Control-Secret': demoSecret}, body: JSON.stringify({demo_run_id: demoRunId}) });
+            const r2 = await fetch(API_C6 + '/reset', { method: 'POST', headers: {'X-Demo-Control-Secret': demoSecret} });
+            
+            if (!r1.ok || !r2.ok) {
+                throw new Error("Reset API returned non-OK status");
+            }
+        } catch (e) {
+            activeScenarioState.outcome = "Error: Failed to communicate with backend reset endpoints.";
+            renderState();
+            return;
+        }
         
         activeScenarioState.generation++;
         activeScenarioState.requestIds.clear();
-        setNotReached(['agent', 'c3', 'c2', 'c4', 'c7', 'c6', 'acmeops']);
-        activeScenarioState.c5 = { decision: 'PENDING', stage: 'PENDING', reason: 'PENDING', ecc: 'PENDING', effect: 'PENDING' };
+        ['agent', 'c3', 'c2', 'c4', 'c7', 'c6', 'acmeops'].forEach(n => setArch(n, 'IDLE', ''));
+        activeScenarioState.c5 = { decision: '-', stage: '-', reason: '-', ecc: '-', effect: '-' };
         activeScenarioState.eccData = null;
         activeScenarioState.outcome = "Demo environment reset. Select a scenario.";
         activeScenarioState.systemEffectValue = '-';
