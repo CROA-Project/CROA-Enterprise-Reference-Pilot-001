@@ -392,7 +392,7 @@
                 const d2 = await r2.json();
                 document.getElementById('dot-acme').className = 'dot ' + (d2.acmeops_reachable ? 'isolated' : '');
             }
-            const r3 = await fetch(API_CROA + '/evidence/verify', {headers: {'X-Demo-Control-Secret': 'local-pilot-secret'}});
+            const r3 = await fetch(API_CROA + '/evidence/verify', {headers: {'X-Demo-Control-Secret': demoSecret}});
             if (r3.ok) {
                 const d3 = await r3.json();
                 document.getElementById('dot-c5').className = 'dot ' + (d3.valid ? 'active' : '');
@@ -408,7 +408,7 @@
     async function fetchEvidence() {
         const fetchGen = activeScenarioState.generation; 
         try {
-            const r = await fetch(API_CROA + '/evidence', {headers: {'X-Demo-Control-Secret': 'local-pilot-secret'}});
+            const r = await fetch(API_CROA + '/evidence', {headers: {'X-Demo-Control-Secret': demoSecret}});
             const evs = await r.json();
             
             // Raw ledger ignores generations
@@ -440,8 +440,8 @@
     async function resetDemo() {
         demoRunId = 'run-' + generateId();
         document.getElementById('run-id').textContent = demoRunId;
-        await fetch(API_CROA + '/reset', { method: 'POST', headers: {'Content-Type': 'application/json', 'X-Demo-Control-Secret': 'local-pilot-secret'}, body: JSON.stringify({demo_run_id: demoRunId}) });
-        await fetch(API_C6 + '/reset', { method: 'POST', headers: {'X-Demo-Control-Secret': 'local-pilot-secret'} });
+        await fetch(API_CROA + '/reset', { method: 'POST', headers: {'Content-Type': 'application/json', 'X-Demo-Control-Secret': demoSecret}, body: JSON.stringify({demo_run_id: demoRunId}) });
+        await fetch(API_C6 + '/reset', { method: 'POST', headers: {'X-Demo-Control-Secret': demoSecret} });
         
         activeScenarioState.generation++;
         activeScenarioState.requestIds.clear();

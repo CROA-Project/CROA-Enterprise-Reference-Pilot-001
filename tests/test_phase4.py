@@ -1,5 +1,5 @@
 import httpx
-import json
+import json\nimport os
 import time
 
 CROA_URL = "http://localhost:8000/propose"
@@ -7,7 +7,7 @@ C6_URL = "http://localhost:8000/execute" # When run in c6 container, it will hit
 ACMEOPS_HISTORY_URL = "http://acmeops_api:8000/internal/history"
 
 def get_acmeops_history(client):
-    resp = client.get(ACMEOPS_HISTORY_URL, headers={"X-Demo-Control-Secret": "local-pilot-secret"})
+    resp = client.get(ACMEOPS_HISTORY_URL, headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]})
     return resp.json()
 
 def run_tests():

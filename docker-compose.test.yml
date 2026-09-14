@@ -1,0 +1,6 @@
+﻿version: '3.8'
+
+services:
+  croa_plane:
+    environment:
+      - ENABLE_TEST_MODE=1

@@ -22,8 +22,12 @@ PUBLIC_KEY_PATH = "/app/public.pem"
 CROA_EVIDENCE_URL = "http://croa_plane:8000/evidence"
 ACMEOPS_URL = "http://acmeops_api:8000"
 
-DEMO_CONTROL_SECRET = os.environ.get("DEMO_CONTROL_SECRET", "local-pilot-secret")
-INTERNAL_SERVICE_SECRET = os.environ.get("INTERNAL_SERVICE_SECRET", "local-internal-secret")
+DEMO_CONTROL_SECRET = os.environ.get("DEMO_CONTROL_SECRET")
+if not DEMO_CONTROL_SECRET:
+    raise RuntimeError("DEMO_CONTROL_SECRET is not set. See .env.example")
+INTERNAL_SERVICE_SECRET = os.environ.get("INTERNAL_SERVICE_SECRET")
+if not INTERNAL_SERVICE_SECRET:
+    raise RuntimeError("INTERNAL_SERVICE_SECRET is not set. See .env.example")
 
 REDEEMED_NONCES = set()
 

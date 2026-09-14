@@ -1,5 +1,5 @@
 ﻿import httpx
-import json
+import json\nimport os
 import uuid
 import time
 import jwt
@@ -11,7 +11,7 @@ def print_result(name, passed):
     print(f"{name}: {'PASS' if passed else 'FAIL'}")
 
 def get_demo_secret_headers():
-    return {"X-Demo-Control-Secret": "local-pilot-secret"}
+    return {"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]}
 
 def test_reset_auth():
     r = httpx.post(f"{CROA_URL}/reset", json={"demo_run_id": "test"})
@@ -135,7 +135,7 @@ def test_concurrency():
             "decision": "TEST",
             "reason": "TEST",
             "decision_stage": "TEST"
-        }, headers={"X-Internal-Service-Secret": "local-internal-secret"})
+        }, headers={"X-Internal-Service-Secret": os.environ["INTERNAL_SERVICE_SECRET"]})
         
     threads = []
     for _ in range(20):

@@ -75,13 +75,25 @@ In the UI, click **Reset Demo**. This will:
 4. Log a `DEMO_RESET` event to the `evidence_data/evidence.jsonl` log to maintain audibility of the reset operation.
 
 ## How to Run Tests
-The automated test scripts are stored in the `scratch/` directory. They can be executed by piping them directly into the Python environment of the `c6_firewall` container, which has the correct network resolution:
+The automated test scripts are stored in the 	ests/ directory. They can be executed by piping them directly into the Python environment of the c6_firewall container, which has the correct network resolution.
 
-```bash
-# Phase 4.1 Regression Tests
-cat tests/test_phase4.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
-
+### Normal Runtime Tests
+These tests assert behavior in the standard environment:
+`ash
 # Phase 5 Automated UI Scenarios
 cat tests/test_phase5.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
-```
 
+# Hardening / Adversarial Scenarios
+cat tests/test_hardening.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
+
+# Prove TTL manipulation is blocked
+cat tests/test_ttl_enforcement.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
+`
+
+### Test Mode Execution
+To run tests that require internal clock/TTL overrides (like the expiration test), you must explicitly restart the plane in test mode:
+`ash
+docker compose -f docker-compose.yml -f docker-compose.test.yml up -d
+cat tests/test_phase4.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
+docker compose up -d # Reverts to normal mode
+`

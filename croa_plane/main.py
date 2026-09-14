@@ -24,8 +24,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DEMO_CONTROL_SECRET = os.environ.get("DEMO_CONTROL_SECRET", "local-pilot-secret")
-INTERNAL_SERVICE_SECRET = os.environ.get("INTERNAL_SERVICE_SECRET", "local-internal-secret")
+DEMO_CONTROL_SECRET = os.environ.get("DEMO_CONTROL_SECRET")
+if not DEMO_CONTROL_SECRET:
+    raise RuntimeError("DEMO_CONTROL_SECRET is not set. See .env.example")
+INTERNAL_SERVICE_SECRET = os.environ.get("INTERNAL_SERVICE_SECRET")
+if not INTERNAL_SERVICE_SECRET:
+    raise RuntimeError("INTERNAL_SERVICE_SECRET is not set. See .env.example")
 C6_URL = "http://c6_firewall:8000"
 
 def verify_demo_control(x_demo_control_secret: str = Header(None)):

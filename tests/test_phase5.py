@@ -1,5 +1,5 @@
 import httpx
-import json
+import json\nimport os
 import time
 
 CROA_URL = "http://croa_plane:8000"
@@ -7,7 +7,7 @@ C6_URL = "http://localhost:8000"
 
 def get_history(client):
     try:
-        r = client.get(f"{C6_URL}/acmeops/history", headers={"X-Demo-Control-Secret": "local-pilot-secret"})
+        r = client.get(f"{C6_URL}/acmeops/history", headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]})
         return r.json()
     except Exception:
         return []
@@ -19,8 +19,8 @@ def run_tests():
     with httpx.Client() as client:
         # Reset
         run_id = f"test-run-{int(time.time())}"
-        client.post(f"{CROA_URL}/reset", json={"demo_run_id": run_id}, headers={"X-Demo-Control-Secret": "local-pilot-secret"})
-        client.post(f"{C6_URL}/reset", headers={"X-Demo-Control-Secret": "local-pilot-secret"})
+        client.post(f"{CROA_URL}/reset", json={"demo_run_id": run_id}, headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]})
+        client.post(f"{C6_URL}/reset", headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]})
         
         # Scenario A
         try:

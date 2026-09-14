@@ -13,14 +13,15 @@ services:
 
   croa_plane:
     build: ./croa_plane
-    environment:
-      - ENABLE_TEST_MODE=1
     ports:
       - "8001:8000"
     networks:
       - edge_network
     volumes:
       - ./evidence_data:/app/evidence_data
+    environment:
+      - DEMO_CONTROL_SECRET=\
+      - INTERNAL_SERVICE_SECRET=\
 
   c6_firewall:
     build: ./c6_firewall
@@ -29,10 +30,12 @@ services:
     networks:
       - edge_network
       - governed_network
+    environment:
+      - DEMO_CONTROL_SECRET=\
+      - INTERNAL_SERVICE_SECRET=\
 
   acmeops_api:
     build: ./acmeops_api
-    # No exposed ports on the host
     networks:
       - governed_network
 
