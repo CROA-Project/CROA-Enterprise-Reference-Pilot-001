@@ -8,7 +8,9 @@ C6_URL = "http://localhost:8000/execute" # When run in c6 container, it will hit
 ACMEOPS_HISTORY_URL = "http://acmeops_api:8000/internal/history"
 
 def get_acmeops_history(client):
-    resp = client.get(ACMEOPS_HISTORY_URL, headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]})
+    # AcmeOps authenticates its firewall: /internal/* requires the internal service secret (v0.2.0).
+    resp = client.get(ACMEOPS_HISTORY_URL, headers={"X-Internal-Service-Secret": os.environ["INTERNAL_SERVICE_SECRET"]})
+    resp.raise_for_status()
     return resp.json()
 
 def run_tests():

@@ -235,3 +235,24 @@ def test_parameter_canonicalization(services, a, b, same):
     h = services["c7"].hash_parameters
     assert (h(a) == h(b)) is same
     assert h(a) == services["c6"].hash_parameters(a)  # C7 and C6 agree byte-for-byte
+
+
+async def test_refusal_gateway_preserves_source_context(c6_client):
+    deny = {
+        "request_id": "p3-03",
+        "session_id": "s",
+        "subject": "agent:1",
+        "action": "export_customers",
+        "target": "endpoint:analytics.internal",
+        "decision": "DENY",
+        "reason": "TRAJECTORY_LIMIT_EXCEEDED",
+        "decision_stage": "C4",
+        "policy_id": "POLICY-002",
+        "current_value": 80,
+        "projected_value": 120,
+        "limit": 100,
+    }
+    r = await c6_client.post("/refuse", json=deny, headers={"X-Internal-Service-Secret": "unit-test-internal-service-secret"})
+    body = r.json()
+    assert body["decision"] == "DENY" and body["decision_stage"] == "C6_REFUSAL_GATEWAY" and body["source_stage"] == "C4"
+    assert body["current_value"] == 80 and body["projected_value"] == 120 and body["policy_id"] == "POLICY-002"

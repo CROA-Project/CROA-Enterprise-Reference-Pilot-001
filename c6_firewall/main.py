@@ -21,7 +21,7 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # --------------------------------------------------------------------------- config
 PLACEHOLDER_SECRETS = {"", "replace-me", "changeme", "change-me", "secret", "password"}
@@ -147,6 +147,11 @@ class ExecuteRequest(BaseModel):
 
 
 class RefusalRequest(BaseModel):
+    """A control-plane denial. Extra fields (trajectory numbers, policy_id, timestamp) are
+    preserved and echoed back: the gateway records the denial, it does not strip its context."""
+
+    model_config = ConfigDict(extra="allow")
+
     request_id: str
     session_id: str
     subject: str
@@ -237,13 +242,16 @@ def _allow(ecc_id: str, execution: dict[str, Any]) -> dict[str, Any]:
 @app.post("/refuse", dependencies=[Depends(verify_internal_service)])
 async def refuse_gateway(req: RefusalRequest):
     await log_evidence(req.request_id, req.session_id, None, req.subject, req.action, req.target, "EXECUTION_BLOCKED", "DENY", req.reason)
-    return {
-        "request_id": req.request_id,
-        "decision": "DENY",
-        "reason": req.reason,
-        "decision_stage": "C6_REFUSAL_GATEWAY",
-        "source_stage": req.decision_stage,
-    }
+    resp = req.model_dump()  # includes the source stage's context (e.g. C4 current/projected values)
+    resp.update(
+        {
+            "decision": "DENY",
+            "reason": req.reason,
+            "decision_stage": "C6_REFUSAL_GATEWAY",
+            "source_stage": req.decision_stage,
+        }
+    )
+    return resp
 
 
 async def _log_unverified_block(req: ExecuteRequest, reason: str) -> None:
