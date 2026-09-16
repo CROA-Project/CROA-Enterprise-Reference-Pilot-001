@@ -1,17 +1,48 @@
-﻿version: '3.8'
+# CROA Enterprise Reference Pilot #001 — local topology.
+# Two networks model the trust boundary: edge_network (UI, control plane, C6) and
+# governed_network (C6, AcmeOps). governed_network is `internal`: no host ports, no egress.
+name: croa-pilot-001
+
+x-hardening: &hardening
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  deploy:
+    resources:
+      limits:
+        memory: 256M
+        cpus: "0.50"
 
 services:
   ui:
     build: ./ui
     ports:
-      - "8080:80"
+      - "8080:8080"
     networks:
       - edge_network
     depends_on:
-      - croa_plane
-      - c6_firewall
+      croa_plane:
+        condition: service_healthy
+      c6_firewall:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   croa_plane:
+    <<: *hardening
     build: ./croa_plane
     ports:
       - "8001:8000"
@@ -19,25 +50,43 @@ services:
       - edge_network
     volumes:
       - ./evidence_data:/app/evidence_data
+      - ./keys/private.pem:/app/keys/private.pem:ro   # runtime custody: never inside the image
     environment:
-      - DEMO_CONTROL_SECRET
-      - INTERNAL_SERVICE_SECRET
+      DEMO_CONTROL_SECRET: ${DEMO_CONTROL_SECRET:?set in .env}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?set in .env}
+      ECC_TTL_SECONDS: ${ECC_TTL_SECONDS:-300}
+      ECC_ISSUER: ${ECC_ISSUER:-croa-plane-pilot}
+      ECC_AUDIENCE: ${ECC_AUDIENCE:-c6-firewall-pilot}
 
   c6_firewall:
+    <<: *hardening
     build: ./c6_firewall
     ports:
       - "8002:8000"
     networks:
       - edge_network
       - governed_network
+    volumes:
+      - ./keys/public.pem:/app/keys/public.pem:ro
     environment:
-      - DEMO_CONTROL_SECRET
-      - INTERNAL_SERVICE_SECRET
+      DEMO_CONTROL_SECRET: ${DEMO_CONTROL_SECRET:?set in .env}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?set in .env}
+      ECC_ISSUER: ${ECC_ISSUER:-croa-plane-pilot}
+      ECC_AUDIENCE: ${ECC_AUDIENCE:-c6-firewall-pilot}
+      C6_TARGET_TIMEOUT_SECONDS: ${C6_TARGET_TIMEOUT_SECONDS:-5}
+    depends_on:
+      croa_plane:
+        condition: service_healthy
+      acmeops_api:
+        condition: service_healthy
 
   acmeops_api:
+    <<: *hardening
     build: ./acmeops_api
     networks:
       - governed_network
+    environment:
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?set in .env}
 
 networks:
   edge_network:

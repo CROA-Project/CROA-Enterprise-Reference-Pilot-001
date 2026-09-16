@@ -1,0 +1,6 @@
+# Changes to enforcement components and the trust model require review by the maintainers.
+*                      @CROA-Project/maintainers
+/c6_firewall/          @CROA-Project/maintainers
+/croa_plane/           @CROA-Project/maintainers
+/docs/THREAT-MODEL.md  @CROA-Project/maintainers
+/docs/ECC-SPEC.md      @CROA-Project/maintainers

@@ -1,6 +1,12 @@
-﻿version: '3.8'
-
+# Overlay for tests that need clock/TTL overrides and fault injection.
+# NEVER use this overlay for demonstrations.
 services:
   croa_plane:
     environment:
-      - ENABLE_TEST_MODE=1
+      ENABLE_TEST_MODE: "1"
+  acmeops_api:
+    environment:
+      ENABLE_TEST_MODE: "1"
+  c6_firewall:
+    environment:
+      C6_TARGET_TIMEOUT_SECONDS: "2"

@@ -1,0 +1,12 @@
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+extend-exclude = ["tests/test_phase*.py", "tests/test_hardening.py", "tests/test_ttl_enforcement.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

@@ -1,5 +1,3 @@
-from typing import Dict, Tuple
-
 FEDERATED_CONTEXT_REGISTRY = {
     "customer:342": "customer",
     "customer:871": "customer",
@@ -7,7 +5,7 @@ FEDERATED_CONTEXT_REGISTRY = {
     "service:notifications": "service",
     "environment:dev": "environment",
     "environment:prod": "environment",
-    "endpoint:analytics.internal": "endpoint"
+    "endpoint:analytics.internal": "endpoint",
 }
 
 ACTION_TARGET_TYPES = {
@@ -15,17 +13,18 @@ ACTION_TARGET_TYPES = {
     "export_customers": "endpoint",
     "change_config": "environment",
     "deploy_service": "service",
-    "delete_environment": "environment"
+    "delete_environment": "environment",
 }
 
-def resolve_target(action: str, target: str) -> Tuple[bool, str]:
+
+def resolve_target(action: str, target: str) -> tuple[bool, str]:
     if target not in FEDERATED_CONTEXT_REGISTRY:
         return False, "TARGET_NOT_REGISTERED"
-    
+
     expected_type = ACTION_TARGET_TYPES.get(action)
     actual_type = FEDERATED_CONTEXT_REGISTRY[target]
-    
+
     if expected_type and actual_type != expected_type:
         return False, "TARGET_TYPE_MISMATCH"
-        
+
     return True, "GROUNDED"
