@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 INVARIANT_SET_VERSION = "pilot-policy-set-v1"
 
@@ -8,42 +8,37 @@ POLICIES = [
         "description": "get_customer is allowed for registered customer targets",
         "action": "get_customer",
         "target_prefix": "customer:",
-        "effect": "PERMIT"
+        "effect": "PERMIT",
     },
     {
         "policy_id": "POLICY-002",
         "description": "export_customers is allowed for the registered analytics endpoint",
         "action": "export_customers",
         "target": "endpoint:analytics.internal",
-        "effect": "PERMIT"
+        "effect": "PERMIT",
     },
     {
         "policy_id": "POLICY-003",
         "description": "change_config is allowed for environment:dev",
         "action": "change_config",
         "target": "environment:dev",
-        "effect": "PERMIT"
+        "effect": "PERMIT",
     },
     {
         "policy_id": "POLICY-004",
         "description": "change_config is denied for environment:prod",
         "action": "change_config",
         "target": "environment:prod",
-        "effect": "DENY"
+        "effect": "DENY",
     },
     {
         "policy_id": "POLICY-005",
         "description": "deploy_service is allowed for service:billing and service:notifications",
         "action": "deploy_service",
         "target_in": ["service:billing", "service:notifications"],
-        "effect": "PERMIT"
+        "effect": "PERMIT",
     },
-    {
-        "policy_id": "POLICY-006",
-        "description": "delete_environment is always denied",
-        "action": "delete_environment",
-        "effect": "DENY"
-    }
+    {"policy_id": "POLICY-006", "description": "delete_environment is always denied", "action": "delete_environment", "effect": "DENY"},
 ]
 
 INVARIANTS = [
@@ -56,11 +51,12 @@ INVARIANTS = [
         "accumulation_parameter": "count",
         "limit": 100,
         "scope": "session_subject",
-        "version": "1"
+        "version": "1",
     }
 ]
 
-def evaluate_policy(action: str, target: str) -> Optional[Dict[str, Any]]:
+
+def evaluate_policy(action: str, target: str) -> dict[str, Any] | None:
     for p in POLICIES:
         if p["action"] == action:
             match = True

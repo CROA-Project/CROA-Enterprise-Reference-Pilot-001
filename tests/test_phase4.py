@@ -8,7 +8,9 @@ C6_URL = "http://localhost:8000/execute" # When run in c6 container, it will hit
 ACMEOPS_HISTORY_URL = "http://acmeops_api:8000/internal/history"
 
 def get_acmeops_history(client):
-    resp = client.get(ACMEOPS_HISTORY_URL, headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]})
+    # AcmeOps authenticates its firewall: /internal/* requires the internal service secret (v0.2.0).
+    resp = client.get(ACMEOPS_HISTORY_URL, headers={"X-Internal-Service-Secret": os.environ["INTERNAL_SERVICE_SECRET"]})
+    resp.raise_for_status()
     return resp.json()
 
 def run_tests():
@@ -19,7 +21,7 @@ def run_tests():
         try:
             h_before = len(get_acmeops_history(client))
             resp = client.post("http://croa_plane:8000/propose", json={
-                "request_id": "req-ecc-01", "session_id": "s-ecc-$((Get-Date).Ticks)", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}
+                "request_id": "req-ecc-01", "session_id": f"s-ecc-{int(time.time()*1000)}", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}
             })
             ecc_data = resp.json()
             ecc_token = ecc_data.get("ecc")
@@ -76,7 +78,7 @@ def run_tests():
 
         # Generate a base ECC for mutations
         resp = client.post("http://croa_plane:8000/propose", json={
-            "request_id": "req-ecc-mut", "session_id": "s-ecc-$((Get-Date).Ticks)", "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}
+            "request_id": "req-ecc-mut", "session_id": f"s-ecc-{int(time.time()*1000)}", "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}
         })
         base_ecc = resp.json().get("ecc")
 
@@ -173,7 +175,7 @@ def run_tests():
         # TEST-ECC-09 Expired ECC
         try:
             resp = client.post("http://croa_plane:8000/propose", headers={"X-Test-Expiry-Seconds": "1"}, json={
-                "request_id": "req-ecc-exp", "session_id": "s-ecc-$((Get-Date).Ticks)", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}, "expiry_seconds": 1
+                "request_id": "req-ecc-exp", "session_id": f"s-ecc-{int(time.time()*1000)}", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}, "expiry_seconds": 1
             })
             exp_ecc = resp.json().get("ecc")
             time.sleep(2) # wait for expiry
@@ -195,7 +197,7 @@ def run_tests():
         # TEST-ECC-10 DENY produces no ECC
         try:
             resp = client.post("http://croa_plane:8000/propose", json={
-                "request_id": "req-ecc-10", "session_id": "s-ecc-$((Get-Date).Ticks)", "subject": "agent:1", "action": "delete_environment", "target": "environment:dev", "parameters": {}
+                "request_id": "req-ecc-10", "session_id": f"s-ecc-{int(time.time()*1000)}", "subject": "agent:1", "action": "delete_environment", "target": "environment:dev", "parameters": {}
             })
             if resp.json().get("ecc") is None:
                 results["TEST-ECC-10"] = "PASS"
