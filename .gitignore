@@ -12,3 +12,8 @@ __pycache__/
 evidence_data/
 
 .env
+
+# Private external evaluation material — never commit
+private_inputs/
+private_scenario_models/
+private_results/
