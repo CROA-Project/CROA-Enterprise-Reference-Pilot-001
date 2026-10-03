@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  croa_plane:
+    build: ../../croa_plane
+    ports:
+      - "8001:8000"
+    networks:
+      - edge_network
+    volumes:
+      - ./evidence_data:/app/evidence_data
+      - ./c1_policy_fixture.py:/app/c1_policy.py
+      - ./c3_resolver_fixture.py:/app/c3_resolver.py
+    environment:
+      - DEMO_CONTROL_SECRET=demo
+      - INTERNAL_SERVICE_SECRET=secret
+
+  c6_firewall:
+    build: ../../c6_firewall
+    ports:
+      - "8002:8000"
+    networks:
+      - edge_network
+      - governed_network
+    environment:
+      - DEMO_CONTROL_SECRET=demo
+      - INTERNAL_SERVICE_SECRET=secret
+
+  acmeops_api:
+    build: ../../acmeops_api
+    networks:
+      - governed_network
+
+  finance_ai:
+    image: python:3.9-slim
+    command: sleep infinity
+    networks:
+      - edge_network
+    depends_on:
+      - croa_plane
+      - c6_firewall
+
+networks:
+  edge_network:
+    driver: bridge
+  governed_network:
+    driver: bridge
+    internal: true
