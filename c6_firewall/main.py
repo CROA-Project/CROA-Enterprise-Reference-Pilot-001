@@ -1,5 +1,6 @@
-﻿from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
+from typing import Optional
 import httpx
 import jwt
 import json
@@ -48,6 +49,7 @@ class ExecuteRequest(BaseModel):
     action: str
     target: str
     parameters: dict
+    request_id: Optional[str] = None
 
 class RefusalRequest(BaseModel):
     request_id: str
@@ -103,7 +105,7 @@ async def refuse_gateway(req: RefusalRequest):
 @app.post("/execute")
 async def execute(req: ExecuteRequest):
     if not req.ecc:
-        log_evidence("unknown", None, None, req.subject, req.action, req.target, "EXECUTION_BLOCKED", "BLOCK", "MISSING_ECC")
+        log_evidence(req.request_id or "unknown", None, None, req.subject, req.action, req.target, "EXECUTION_BLOCKED", "BLOCK", "MISSING_ECC")
         return {"decision": "BLOCK", "reason": "MISSING_ECC"}
         
     try:
