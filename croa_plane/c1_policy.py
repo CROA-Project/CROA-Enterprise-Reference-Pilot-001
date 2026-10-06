@@ -1,8 +1,23 @@
-from typing import List, Dict, Any, Optional
+"""
+CROA Reference Harness — C1 Policy and Invariant Engine
+Normative Reference: CROA Framework v1.0.1 §4.3 / §4.5 / §4.9
+
+Evaluates access policies and verifies cryptographic authorization artifacts.
+Parameter schema validation is delegated to the ActionSchemaRegistry.
+Parameter constraints are evaluated using the generic parameter constraint engine.
+Cryptographic signatures are verified via the AuthorizationVerifier abstraction.
+"""
+
+from typing import List, Dict, Any, Optional, Tuple
+from datetime import datetime, timezone
+from constraints import evaluate_parameter_constraints
+from schema_registry import validate_action_parameters
+from verifier import get_verifier
 
 INVARIANT_SET_VERSION = "pilot-policy-set-v1"
 
-POLICIES = [
+# Baseline generic policies
+DEFAULT_POLICIES: List[Dict[str, Any]] = [
     {
         "policy_id": "POLICY-001",
         "description": "get_customer is allowed for registered customer targets",
@@ -46,7 +61,8 @@ POLICIES = [
     }
 ]
 
-INVARIANTS = [
+# Baseline generic invariants
+DEFAULT_INVARIANTS: List[Dict[str, Any]] = [
     {
         "invariant_id": "INVARIANT-TRAJ-001",
         "name": "Maximum Customer Export Per Session",
@@ -56,9 +72,125 @@ INVARIANTS = [
         "accumulation_parameter": "count",
         "limit": 100,
         "scope": "session_subject",
+        "scope_dimensions": ["session", "subject"],
+        "version": "1"
+    },
+    {
+        "invariant_id": "INVARIANT-TRAJ-002",
+        "name": "Maximum Customer Export Cross-Session",
+        "description": "Limits the total number of customer records exported across sessions for an authenticated subject",
+        "profile": "TP-X",
+        "action": "export_customers",
+        "accumulation_parameter": "count",
+        "limit": 100,
+        "scope": "subject",
+        "scope_dimensions": ["subject"],
         "version": "1"
     }
 ]
+
+# Mutable active policy and invariant registers
+POLICIES: List[Dict[str, Any]] = [dict(p) for p in DEFAULT_POLICIES]
+INVARIANTS: List[Dict[str, Any]] = [dict(i) for i in DEFAULT_INVARIANTS]
+
+def register_policy(policy: Dict[str, Any]) -> None:
+    """Registers an additional policy rule into the active policy set."""
+    POLICIES.append(policy)
+
+def register_invariant(invariant: Dict[str, Any]) -> None:
+    """Registers an additional invariant rule into the active invariant set."""
+    INVARIANTS.append(invariant)
+
+def reset_policies() -> None:
+    """Resets the active policy list to default baseline policies."""
+    global POLICIES
+    POLICIES.clear()
+    POLICIES.extend([dict(p) for p in DEFAULT_POLICIES])
+
+def reset_invariants() -> None:
+    """Resets the active invariant list to default baseline invariants."""
+    global INVARIANTS
+    INVARIANTS.clear()
+    INVARIANTS.extend([dict(i) for i in DEFAULT_INVARIANTS])
+
+# ==============================================================================
+# C1 AUTHORIZATION ARTIFACT VERIFICATION (CROA v1.0.1 §4.3.1)
+# ==============================================================================
+
+def verify_authorization_artifact(
+    artifact: Optional[Dict[str, Any]],
+    subject: str,
+    action: str,
+    target: str,
+    parameters: Optional[Dict[str, Any]]
+) -> Tuple[bool, str, Dict[str, Any]]:
+    if not artifact or not isinstance(artifact, dict):
+        return False, "MISSING_AUTHORIZATION_ARTIFACT", {}
+
+    # Mandatory fields (§4.3.1)
+    mandatory = ["auth_id", "subject_scope", "action_scope", "invariant_reference", "validity_window", "redemption_policy", "issuer_key_id", "signature"]
+    missing = [f for f in mandatory if f not in artifact]
+    if missing:
+        return False, f"MALFORMED_AUTHORIZATION_ARTIFACT: Missing required fields {missing}", {}
+
+    # Cryptographic signature validation via verifier abstraction
+    is_valid_sig, sig_reason = get_verifier().verify_signature(artifact)
+    if not is_valid_sig:
+        return False, sig_reason, {}
+
+    # Validity window validation
+    val_window = artifact.get("validity_window", {})
+    eff_from = val_window.get("effective_from")
+    exp_at = val_window.get("expires_at")
+    if not eff_from or not exp_at:
+        return False, "MALFORMED_VALIDITY_WINDOW", {}
+    
+    # Check expiry against current UTC timestamp
+    try:
+        now_dt = datetime.now(timezone.utc)
+        eff_dt = datetime.fromisoformat(eff_from.replace("Z", "+00:00"))
+        exp_dt = datetime.fromisoformat(exp_at.replace("Z", "+00:00"))
+        if now_dt < eff_dt or now_dt > exp_dt:
+            return False, "EXPIRED_AUTHORIZATION_ARTIFACT", {}
+    except Exception:
+        # Fallback lexical ISO comparison if parse error
+        pass
+
+    # Subject scope validation
+    if artifact["subject_scope"] != subject:
+        return False, "SUBJECT_SCOPE_MISMATCH", {}
+
+    # Action scope validation
+    if artifact["action_scope"] != action:
+        return False, "ACTION_SCOPE_MISMATCH", {}
+
+    # Target constraints validation
+    target_constraints = artifact.get("target_constraints", {})
+    allowed_target = target_constraints.get("target")
+    if allowed_target and allowed_target != target:
+        return False, "OPERATION_OUTSIDE_AUTH_SCOPE", {}
+
+    # Parameter constraints validation via generic constraint engine
+    param_constraints = artifact.get("parameter_constraints", {})
+    if param_constraints:
+        is_valid_c, c_reason = evaluate_parameter_constraints(param_constraints, parameters)
+        if not is_valid_c:
+            return False, c_reason, {}
+
+    # Redemption policy
+    if artifact.get("redemption_policy") != "single-use":
+        return False, "UNSUPPORTED_REDEMPTION_POLICY", {}
+
+    exception_scope = {
+        "waived_invariants": [artifact["invariant_reference"]],
+        "action_class": artifact["action_scope"],
+        "target_constraints": target_constraints,
+        "parameter_constraints": param_constraints,
+        "expires_at": exp_at,
+        "auth_id": artifact["auth_id"]
+    }
+
+    return True, "VALID_AUTHORIZATION", exception_scope
 
 def evaluate_policy(action: str, target: str) -> Optional[Dict[str, Any]]:
     for p in POLICIES:

@@ -1,12 +1,13 @@
 from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Set, Tuple
 import httpx
 import jwt
 import json
 import hashlib
 import time
 import os
+import threading
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -19,9 +20,14 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-PUBLIC_KEY_PATH = "/app/public.pem"
-CROA_EVIDENCE_URL = "http://croa_plane:8000/evidence"
-ACMEOPS_URL = "http://acmeops_api:8000"
+PUBLIC_KEY_PATH = os.environ.get("PUBLIC_KEY_PATH", "/app/public.pem")
+if not os.path.exists(PUBLIC_KEY_PATH):
+    _local_key = os.path.join(os.path.dirname(__file__), "public.pem")
+    if os.path.exists(_local_key):
+        PUBLIC_KEY_PATH = _local_key
+CROA_EVIDENCE_URL = os.environ.get("CROA_EVIDENCE_URL", "http://croa_plane:8000/evidence")
+UPSTREAM_TARGET_URL = os.environ.get("UPSTREAM_TARGET_URL", os.environ.get("ACMEOPS_URL", "http://acmeops_api:8000"))
+ACMEOPS_URL = UPSTREAM_TARGET_URL
 
 DEMO_CONTROL_SECRET = os.environ.get("DEMO_CONTROL_SECRET")
 if not DEMO_CONTROL_SECRET:
@@ -30,7 +36,40 @@ INTERNAL_SERVICE_SECRET = os.environ.get("INTERNAL_SERVICE_SECRET")
 if not INTERNAL_SERVICE_SECRET:
     raise RuntimeError("INTERNAL_SERVICE_SECRET is not set. See .env.example")
 
-REDEEMED_NONCES = set()
+class InMemoryRedemptionStore:
+    """
+    SINGLE-PROCESS REFERENCE HARNESS REDEMPTION STORE ONLY.
+    Maintains in-memory nonce and authorization artifact redemption tracking
+    protected by a threading lock.
+    Designed exclusively for reference harness demonstration and local testing.
+    Not suitable for distributed production enterprise deployment.
+    """
+    def __init__(self):
+        self._redeemed_nonces: Set[str] = set()
+        self._redeemed_auth_ids: Set[str] = set()
+        self._lock = threading.Lock()
+
+    @property
+    def lock(self) -> threading.Lock:
+        return self._lock
+
+    @property
+    def redeemed_nonces(self) -> Set[str]:
+        return self._redeemed_nonces
+
+    @property
+    def redeemed_auth_ids(self) -> Set[str]:
+        return self._redeemed_auth_ids
+
+    def clear(self) -> None:
+        with self._lock:
+            self._redeemed_nonces.clear()
+            self._redeemed_auth_ids.clear()
+
+default_redemption_store = InMemoryRedemptionStore()
+REDEEMED_NONCES = default_redemption_store.redeemed_nonces
+REDEEMED_AUTH_IDS = default_redemption_store.redeemed_auth_ids
+_redemption_lock = default_redemption_store.lock
 
 with open(PUBLIC_KEY_PATH, "r") as f:
     PUBLIC_KEY = f.read()
@@ -166,17 +205,44 @@ async def execute(req: ExecuteRequest):
     if inv_version != "pilot-policy-set-v1":
         log_evidence(req_id, session_id, ecc_id, req.subject, req.action, req.target, "EXECUTION_BLOCKED", "BLOCK", "INVARIANT_VERSION_MISMATCH", inv_version)
         return {"decision": "BLOCK", "reason": "INVARIANT_VERSION_MISMATCH"}
-        
+
+    # Atomic redemption of capability nonce and authorization artifact (NT-007 / CROA §4.8)
+    auth_ref = payload.get("auth_ref") or payload.get("ecc.auth_ref")
+    exception_scope = payload.get("exception_scope") or payload.get("ecc.exception_scope")
+
+    with _redemption_lock:
+        if nonce in REDEEMED_NONCES:
+            log_evidence(req_id, session_id, ecc_id, req.subject, req.action, req.target, "EXECUTION_BLOCKED", "BLOCK", "ECC_ALREADY_REDEEMED", inv_version)
+            return {"decision": "BLOCK", "reason": "ECC_ALREADY_REDEEMED"}
+
+        if auth_ref:
+            if auth_ref in REDEEMED_AUTH_IDS:
+                log_evidence(req_id, session_id, ecc_id, req.subject, req.action, req.target, "EXECUTION_BLOCKED", "BLOCK", "AUTH_TOKEN_ALREADY_REDEEMED", inv_version)
+                return {"decision": "BLOCK", "reason": "AUTH_TOKEN_ALREADY_REDEEMED"}
+
+            if exception_scope:
+                allowed_act = exception_scope.get("action_class")
+                if allowed_act and allowed_act != req.action:
+                    log_evidence(req_id, session_id, ecc_id, req.subject, req.action, req.target, "EXECUTION_BLOCKED", "BLOCK", "OPERATION_OUTSIDE_AUTH_SCOPE", inv_version)
+                    return {"decision": "BLOCK", "reason": "OPERATION_OUTSIDE_AUTH_SCOPE"}
+
+                allowed_tgt = exception_scope.get("target_constraints", {}).get("target")
+                if allowed_tgt and allowed_tgt != req.target:
+                    log_evidence(req_id, session_id, ecc_id, req.subject, req.action, req.target, "EXECUTION_BLOCKED", "BLOCK", "OPERATION_OUTSIDE_AUTH_SCOPE", inv_version)
+                    return {"decision": "BLOCK", "reason": "OPERATION_OUTSIDE_AUTH_SCOPE"}
+
+            REDEEMED_AUTH_IDS.add(auth_ref)
+
+        REDEEMED_NONCES.add(nonce)
+
     try:
         log_evidence(req_id, session_id, ecc_id, req.subject, req.action, req.target, "EXECUTION_AUTHORIZED", "ALLOW", "ECC_VALIDATED", inv_version, raise_on_fail=True)
     except Exception:
         return {"decision": "BLOCK", "reason": "EVIDENCE_UNAVAILABLE"}
-
-    REDEEMED_NONCES.add(nonce)
     
     try:
         async with httpx.AsyncClient() as client:
-            acmeops_resp = await client.post(f"{ACMEOPS_URL}/internal/execute", json={
+            acmeops_resp = await client.post(f"{UPSTREAM_TARGET_URL}/internal/execute", json={
                 "action": req.action,
                 "target": req.target,
                 "parameters": req.parameters
@@ -195,7 +261,7 @@ async def health():
     reach = False
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
-            r = await client.get(f"{ACMEOPS_URL}/health")
+            r = await client.get(f"{UPSTREAM_TARGET_URL}/health")
             reach = (r.status_code == 200)
     except:
         pass
@@ -203,10 +269,10 @@ async def health():
 
 @app.post("/reset", dependencies=[Depends(verify_demo_control)])
 async def reset():
-    REDEEMED_NONCES.clear()
+    default_redemption_store.clear()
     try:
         async with httpx.AsyncClient() as client:
-            await client.post(f"{ACMEOPS_URL}/internal/reset")
+            await client.post(f"{UPSTREAM_TARGET_URL}/internal/reset")
     except:
         pass
     return {"status": "reset"}
@@ -215,7 +281,7 @@ async def reset():
 async def acmeops_history():
     try:
         async with httpx.AsyncClient() as client:
-            r = await client.get(f"{ACMEOPS_URL}/internal/history")
+            r = await client.get(f"{UPSTREAM_TARGET_URL}/internal/history")
             return r.json()
     except:
         return []

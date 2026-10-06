@@ -1,4 +1,12 @@
-﻿from fastapi import FastAPI, HTTPException, Header, Request, Depends
+"""
+CROA Reference Harness — Control Plane Intake and Orchestrator
+Normative Reference: CROA Framework v1.0.1 §4.2 / §4.5 / §4.9
+
+Agent Surface admission, Subject authentication, target grounding,
+governed decisioning, and capability token issuance.
+"""
+
+from fastapi import FastAPI, HTTPException, Header, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
@@ -8,11 +16,13 @@ from datetime import datetime
 import os
 import httpx
 
+from c1_policy import validate_action_parameters
 from c3_resolver import resolve_target
 from c2_governor import evaluate_request
 from c5_evidence import record_event
 from c7_compiler import generate_ecc
 from c4_trajectory import trajectory_state
+from auth import get_authenticator, SubjectAuthenticator
 
 app = FastAPI()
 _test_c5_unavailable = False
@@ -31,7 +41,7 @@ if not DEMO_CONTROL_SECRET:
 INTERNAL_SERVICE_SECRET = os.environ.get("INTERNAL_SERVICE_SECRET")
 if not INTERNAL_SERVICE_SECRET:
     raise RuntimeError("INTERNAL_SERVICE_SECRET is not set. See .env.example")
-C6_URL = "http://c6_firewall:8000"
+C6_URL = os.environ.get("C6_URL", "http://c6_firewall:8000")
 
 def verify_demo_control(x_demo_control_secret: str = Header(None)):
     if x_demo_control_secret != DEMO_CONTROL_SECRET:
@@ -49,6 +59,7 @@ class ProposeRequest(BaseModel):
     target: str
     parameters: Optional[Dict[str, Any]] = {}
     expiry_seconds: Optional[int] = None
+    authorization_artifact: Optional[Dict[str, Any]] = None
 
 class EvidenceRequest(BaseModel):
     request_id: str
@@ -150,7 +161,8 @@ def post_evidence(ev: EvidenceRequest):
 
 def forward_to_c6_refusal_gateway(deny_payload: dict) -> dict:
     try:
-        with httpx.Client() as client:
+        refusal_timeout = float(os.environ.get("C6_REFUSAL_TIMEOUT", "0.2"))
+        with httpx.Client(timeout=refusal_timeout) as client:
             resp = client.post(
                 f"{C6_URL}/refuse",
                 json=deny_payload,
@@ -162,44 +174,104 @@ def forward_to_c6_refusal_gateway(deny_payload: dict) -> dict:
         pass
     return deny_payload
 
+# ==============================================================================
+# AGENT SURFACE INTAKE AUTHENTICATION (CROA Framework v1.0.1 §4.9)
+# Pluggable SubjectAuthenticator dependency injection with strict fail-closed logic
+# ==============================================================================
+
+def authenticate_subject_intake(
+    authorization: Optional[str] = Header(None),
+    x_subject_token: Optional[str] = Header(None),
+    authenticator: SubjectAuthenticator = Depends(get_authenticator)
+) -> str:
+    """
+    Intake authentication hook verifying caller credentials against pluggable authenticator.
+    Fails closed with 401 on missing or invalid tokens.
+    """
+    return authenticator.authenticate(authorization, x_subject_token)
+
 @app.post("/propose")
-def propose_action(req: ProposeRequest):
+def propose_action(
+    req: ProposeRequest,
+    auth_subject: str = Depends(authenticate_subject_intake)
+):
+    # Enforce that caller body cannot redefine or spoof authenticated Subject identity
+    if req.subject and req.subject != auth_subject:
+        raise HTTPException(
+            status_code=403,
+            detail=f"SUBJECT_AUTHENTICATION_MISMATCH: Caller claim '{req.subject}' does not match authenticated Subject '{auth_subject}'"
+        )
+    
+    # Overwrite/bind authenticated Subject as authoritative identity for downstream governance
+    governed_subject = auth_subject
+
     timestamp = datetime.utcnow().isoformat() + "Z"
+
+    # Agent Surface Admission Boundary: Strict Parameter Contract Validation (CROA §4.9.1 / §4.5.1)
+    is_valid_param, param_reason = validate_action_parameters(req.action, req.parameters)
+    if not is_valid_param:
+        record_event(
+            req.request_id, req.session_id, governed_subject, req.action, req.target, 
+            "ADMISSION_REJECTED", "DENY", param_reason, "AGENT_SURFACE_ADMISSION", None, "pilot-policy-set-v1"
+        )
+        deny_payload = {
+            "request_id": req.request_id, "session_id": req.session_id, "subject": governed_subject, "action": req.action, "target": req.target,
+            "decision": "DENY", "reason": param_reason, "decision_stage": "AGENT_SURFACE_ADMISSION", "policy_id": None, "invariant_set_version": "pilot-policy-set-v1", "timestamp": timestamp
+        }
+        return forward_to_c6_refusal_gateway(deny_payload)
+
     is_grounded, grounding_reason = resolve_target(req.action, req.target)
     
     if not is_grounded:
-        record_event(req.request_id, req.session_id, req.subject, req.action, req.target, 
+        record_event(req.request_id, req.session_id, governed_subject, req.action, req.target, 
                      "GROUNDING_FAILED", "DENY", grounding_reason, "C3", None, "pilot-policy-set-v1")
         deny_payload = {
-            "request_id": req.request_id, "session_id": req.session_id, "subject": req.subject, "action": req.action, "target": req.target,
+            "request_id": req.request_id, "session_id": req.session_id, "subject": governed_subject, "action": req.action, "target": req.target,
             "decision": "DENY", "reason": grounding_reason, "decision_stage": "C3", "policy_id": None, "invariant_set_version": "pilot-policy-set-v1", "timestamp": timestamp
         }
         return forward_to_c6_refusal_gateway(deny_payload)
         
-    record_event(req.request_id, req.session_id, req.subject, req.action, req.target, 
+    record_event(req.request_id, req.session_id, governed_subject, req.action, req.target, 
                  "GROUNDING_PASSED", "PERMIT", "TARGET_GROUNDED", "C3", None, "pilot-policy-set-v1")
         
-    c2_result = evaluate_request(req.dict())
+    proposal_data = req.dict()
+    proposal_data["subject"] = governed_subject
+    c2_result = evaluate_request(proposal_data)
     
     if c2_result["decision"] == "DENY":
         c2_result["session_id"] = req.session_id
         return forward_to_c6_refusal_gateway(c2_result)
         
-    if c2_result["decision"] == "PERMIT":
+    if c2_result["decision"] in ("PERMIT", "PERMIT_WITH_AUTHORIZATION"):
         ttl = req.expiry_seconds if (req.expiry_seconds is not None and int(os.environ.get('ENABLE_TEST_MODE', '0')) == 1) else int(os.environ.get('ECC_TTL_SECONDS', 300))
         
         ecc_data = generate_ecc(
-            request_id=req.request_id, session_id=req.session_id, subject=req.subject,
+            request_id=req.request_id, session_id=req.session_id, subject=governed_subject,
             action=req.action, target=req.target, parameters=req.parameters,
-            invariant_set_version=c2_result["invariant_set_version"], expiry_seconds=ttl
+            invariant_set_version=c2_result["invariant_set_version"], expiry_seconds=ttl,
+            decision_basis=c2_result["decision"],
+            auth_id=c2_result.get("auth_id"),
+            exception_scope=c2_result.get("exception_scope")
         )
+        ecc_ev_data = {
+            "ecc_id": ecc_data["ecc_id"],
+            "parameters_hash": ecc_data["parameters_hash"],
+            "expires_at": ecc_data["expires_at"]
+        }
+        if "auth_ref" in ecc_data:
+            ecc_ev_data["auth_ref"] = ecc_data["auth_ref"]
+
         record_event(
-            req.request_id, req.session_id, req.subject, req.action, req.target,
+            req.request_id, req.session_id, governed_subject, req.action, req.target,
             "ECC_ISSUED", "PERMIT", "ECC_GENERATED", "C7", c2_result["policy_id"], c2_result["invariant_set_version"],
-            ecc_data={"ecc_id": ecc_data["ecc_id"], "parameters_hash": ecc_data["parameters_hash"], "expires_at": ecc_data["expires_at"]}
+            ecc_data=ecc_ev_data
         )
         c2_result["ecc_id"] = ecc_data["ecc_id"]
         c2_result["ecc"] = ecc_data["ecc"]
         c2_result["expires_at"] = ecc_data["expires_at"]
+        if "auth_ref" in ecc_data:
+            c2_result["auth_ref"] = ecc_data["auth_ref"]
+        if "exception_scope" in ecc_data:
+            c2_result["exception_scope"] = ecc_data["exception_scope"]
         
     return c2_result
