@@ -1,0 +1,170 @@
+{
+  "protocol": "CROA × TMG Original Assurance Protocol",
+  "closeout_type": "DOCUMENTARY_CORRECTION_AND_FREEZE",
+  "final_adjudication_version": "v1.2",
+  "final_adjudication_path": "tests/final_assurance_pack/adjudication/FINAL_CONSOLIDATED_ADJUDICATION_v1_2.md",
+  "final_adjudication_sha256": "2b12c5204d57c803df091afd80d6c732dfea54cd7273f574630f7a67d5ed8441",
+  "normative_baseline": "CROA Framework v1.0.1",
+  "repository_baseline": "f0aa445317ba5470b4816c723ce55796e7332594",
+  "chain_of_custody": "PASS",
+  "original_protocol_completion_status": "COMPLETE",
+  "core_governance_chain_status": "DEMONSTRATED",
+  "framework_change_required_by_tested_findings": "NO",
+  "framework_failure_demonstrated": "NO",
+  "reference_implementation_remediation_was_required": "YES",
+  "final_assurance_residual_blocking_gap_count": 0,
+  "general_i8_composition_status": "PARTIALLY_DEMONSTRATED",
+  "new_runtime_required": "NO",
+  "new_remediation_required": "NO",
+  "protocol_closeout_authorized": "YES",
+  "historical_failures_preserved": true,
+  "invalid_runtime_history_preserved": true,
+  "legacy_docker_unadapted_result": "FAIL_PRESERVED",
+  "legacy_property_compatibility_validation": "PASS",
+  "c5_evidence_trust_status": "BOUNDED_PILOT_EVIDENCE",
+  "p4_status": "TESTED_TOPOLOGY_DEMONSTRATED",
+  "controlling_evidence": [
+    {
+      "artifact": "Summit Q1 Test 1 Frozen Evidence",
+      "path": "tests/summit_q1/SUMMIT-Q1-TEST1-CLEANROOM-RUNTIME-004/post_execution_freeze_manifest.json",
+      "recorded_sha256": "8d28323afc9d960eeab6b5a29622c93da8e15931103cd3215c8ff0feca7c637c",
+      "current_sha256": "8d28323afc9d960eeab6b5a29622c93da8e15931103cd3215c8ff0feca7c637c",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Summit Q1 Test 1 Adjudication",
+      "path": "tests/summit_q1/Q1_TEST_1_FINAL_ADJUDICATION.md",
+      "recorded_sha256": "7abe9202d8da24434d69ca3979a91c500bff15c08e5129abe8fbeb8e9f284a40",
+      "current_sha256": "7abe9202d8da24434d69ca3979a91c500bff15c08e5129abe8fbeb8e9f284a40",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Summit Q1 Test 2 Frozen Evidence",
+      "path": "tests/conformance/evidence/summit_q1_test_2/runtime_009/post_execution_freeze_manifest.json",
+      "recorded_sha256": "8f0c2a851198e7c7631c620341adb9d1ee5f4eee2c4eb0c2f11fd49a7029a6ba",
+      "current_sha256": "8f0c2a851198e7c7631c620341adb9d1ee5f4eee2c4eb0c2f11fd49a7029a6ba",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "RUNTIME-009 Final Adjudication",
+      "path": "tests/conformance/adjudication/Q1_TEST_2_RUNTIME_009_FINAL_ADJUDICATION.md",
+      "recorded_sha256": "8e7d642a0b9e34deff0265cdf315fe3cc5f3c945617beb3cba848e1a8ed127ca",
+      "current_sha256": "8e7d642a0b9e34deff0265cdf315fe3cc5f3c945617beb3cba848e1a8ed127ca",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 3C Closeout Manifest",
+      "path": "tests/conformance/manifests/phase_3c_closeout_manifest.json",
+      "recorded_sha256": "1b3eef6e601512a0426ffa4626cf205b546403266301f8d52555a9ba674e9e48",
+      "current_sha256": "1b3eef6e601512a0426ffa4626cf205b546403266301f8d52555a9ba674e9e48",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 3C Verification Report",
+      "path": "tests/conformance/evidence/phase_3c/phase_3c_verification_report.json",
+      "recorded_sha256": "b7af023b38f69bede6467e395da1ca61393738402c9b83766fa5d8b0099974fb",
+      "current_sha256": "b7af023b38f69bede6467e395da1ca61393738402c9b83766fa5d8b0099974fb",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 5 Pre-Execution Freeze",
+      "path": "tests/final_assurance_pack/PRE_EXECUTION_FREEZE_MANIFEST.json",
+      "recorded_sha256": "8494a91747515e99f731b8b36b94c57cc6ed66afb7e3380ad71a16ad90353970",
+      "current_sha256": "8494a91747515e99f731b8b36b94c57cc6ed66afb7e3380ad71a16ad90353970",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 6 RED Report",
+      "path": "tests/final_assurance_pack/evidence/baseline_red/red_execution_report.json",
+      "recorded_sha256": "ddafd1b70550c0fecadf64453fbe7114cfd035eb44ff13d5a95403ec27dc33a1",
+      "current_sha256": "ddafd1b70550c0fecadf64453fbe7114cfd035eb44ff13d5a95403ec27dc33a1",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 6 RED Post-Execution Manifest",
+      "path": "tests/final_assurance_pack/evidence/baseline_red/red_post_execution_manifest.json",
+      "recorded_sha256": "3804b07b8f142d04f1ee41974f07d38706f81893c9e853728be9fba5039f0fc0",
+      "current_sha256": "3804b07b8f142d04f1ee41974f07d38706f81893c9e853728be9fba5039f0fc0",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 7 GREEN Report",
+      "path": "tests/final_assurance_pack/evidence/green/green_execution_report.json",
+      "recorded_sha256": "793ee8c9d1645c335b350de20ee08624b057bd59c28f4a17535c813d60f8109c",
+      "current_sha256": "793ee8c9d1645c335b350de20ee08624b057bd59c28f4a17535c813d60f8109c",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 7 GREEN Post-Execution Manifest",
+      "path": "tests/final_assurance_pack/evidence/green/green_post_execution_manifest.json",
+      "recorded_sha256": "ec4f1fd0bc50a4542998d2ede9be88b5a8c834fc188c19d8c675229499eb401f",
+      "current_sha256": "ec4f1fd0bc50a4542998d2ede9be88b5a8c834fc188c19d8c675229499eb401f",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 8 Regression Closeout Report",
+      "path": "tests/final_assurance_pack/evidence/regression_closeout/regression_closeout_report.json",
+      "recorded_sha256": "e20db4efa1ff1c0331b2cc5d452e2ec5fa737163dc0a4734a6f01178f341b001",
+      "current_sha256": "e20db4efa1ff1c0331b2cc5d452e2ec5fa737163dc0a4734a6f01178f341b001",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 8 Regression Closeout Manifest",
+      "path": "tests/final_assurance_pack/evidence/regression_closeout/regression_closeout_manifest.json",
+      "recorded_sha256": "6f4189b95a116c87f6e3e9c0a730a40f75d8226a963ab9e18942b26d01b319e1",
+      "current_sha256": "6f4189b95a116c87f6e3e9c0a730a40f75d8226a963ab9e18942b26d01b319e1",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 8 Legacy Docker Baseline",
+      "path": "tests/final_assurance_pack/evidence/regression_closeout/legacy_docker_results.json",
+      "recorded_sha256": "af5a198648e2dc135a8718b6dff3becdfca1bc2da7f5ecfedc1db61f8b0ddb2a",
+      "current_sha256": "af5a198648e2dc135a8718b6dff3becdfca1bc2da7f5ecfedc1db61f8b0ddb2a",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 8B Compatibility Results",
+      "path": "tests/final_assurance_pack/evidence/legacy_compatibility/compatibility_results.json",
+      "recorded_sha256": "f01466e878cb09cacb5eea95b2ad31cbe654f5dd46866f6ddc39a75ae1b89771",
+      "current_sha256": "f01466e878cb09cacb5eea95b2ad31cbe654f5dd46866f6ddc39a75ae1b89771",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 8B Non-Interference Analysis",
+      "path": "tests/final_assurance_pack/evidence/legacy_compatibility/non_interference_analysis.json",
+      "recorded_sha256": "15055ef34ed12257e5794fb01ec8bd8f4a1de85c330a3da0e6d0d6a1895197f5",
+      "current_sha256": "15055ef34ed12257e5794fb01ec8bd8f4a1de85c330a3da0e6d0d6a1895197f5",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 8B Compatibility Report",
+      "path": "tests/final_assurance_pack/evidence/legacy_compatibility/legacy_compatibility_report.json",
+      "recorded_sha256": "c0b4528d9cc99d12f3880b88488e4bcff8f765064486d20a7cb2fe7059f0b917",
+      "current_sha256": "c0b4528d9cc99d12f3880b88488e4bcff8f765064486d20a7cb2fe7059f0b917",
+      "status": "MATCH"
+    },
+    {
+      "artifact": "Phase 8B Post-Execution Manifest",
+      "path": "tests/final_assurance_pack/evidence/legacy_compatibility/legacy_compatibility_post_manifest.json",
+      "recorded_sha256": "7a08786129ad55e2f613c227ea2d09ba77d82aacc916f6aabf1be30a2be5f13e",
+      "current_sha256": "7a08786129ad55e2f613c227ea2d09ba77d82aacc916f6aabf1be30a2be5f13e",
+      "status": "MATCH"
+    }
+  ],
+  "phase_8c_reconciliation_status": "NEWLY_RECORDED_AT_FINAL_FREEZE",
+  "phase_8c_transcript_path": "tests/final_assurance_pack/adjudication/PHASE_8C_FORENSIC_RECONCILIATION_TRANSCRIPT.md",
+  "phase_8c_transcript_sha256": "4b825e3404d882c0cfb6663a627f750bf0b024547f21274bf5d5716809f951d0",
+  "previous_invalid_freeze": {
+    "status": "INVALID",
+    "previous_final_adjudication_version": "v1.1",
+    "previous_final_adjudication_sha256": "bb507e4547f33e9c26da402a87045c352cdef8da82caa94fb48d127e38192fb8",
+    "previous_manifest_path": "tests/final_assurance_pack/adjudication/TMG_CROA_ORIGINAL_ASSURANCE_PROTOCOL_FINAL_CLOSEOUT_MANIFEST.json",
+    "previous_manifest_sha256": "67ce09a9154886a1d0e6db2056e094afc4c91881b87e5c8e75c8555cba874788",
+    "previous_closeout_record_path": "tests/final_assurance_pack/adjudication/TMG_CROA_ORIGINAL_ASSURANCE_PROTOCOL_CLOSEOUT.md",
+    "previous_closeout_record_sha256": "d1b2fd98172b3247592e7044e99e4bd54708409afa5c3992ceaa0cdd61411cdc",
+    "correction_reason": "TWO_EVIDENCE_REGISTER_HASH_TRANSCRIPTION_ERRORS"
+  },
+  "no_new_execution": true,
+  "no_framework_change": true,
+  "no_sut_change": true
+}
