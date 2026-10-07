@@ -1,4 +1,4 @@
-﻿import httpx
+import httpx
 import time
 import os
 
@@ -10,7 +10,11 @@ def run_ttl_enforcement_test():
     env = os.environ.copy()
     if "ENABLE_TEST_MODE" in env:
         del env["ENABLE_TEST_MODE"]
-    # We must ensure we test the normal runtime, so we spawn a fresh croa_plane without test mode
+    # We must ensure we test the normal runtime, so we spawn a fresh croa_plane without test mode.
+    # It gets its own evidence file: C5 is single-writer and refuses to extend a log another
+    # process has appended to (see docs/adr/0003-evidence-fail-closed.md).
+    env["CROA_EVIDENCE_FILE"] = "/tmp/ttl-test-evidence.jsonl"
+    # Run this script inside the croa_plane container (it spawns the control plane, not C6).
     p = subprocess.Popen(["uvicorn", "main:app", "--port", "8008", "--host", "127.0.0.1"], env=env, cwd="/app")
     for _ in range(20):
         try:

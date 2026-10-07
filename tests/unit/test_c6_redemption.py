@@ -23,7 +23,7 @@ if repo_root not in sys.path:
 if croa_plane_path not in sys.path:
     sys.path.insert(0, croa_plane_path)
 
-os.environ["DEMO_CONTROL_SECRET"] = "test-secret"
+os.environ["DEMO_CONTROL_SECRET"] = "test-secret-unit-test"
 os.environ["INTERNAL_SERVICE_SECRET"] = "test-internal-secret"
 
 import c7_compiler

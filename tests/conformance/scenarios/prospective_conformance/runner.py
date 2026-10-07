@@ -16,7 +16,7 @@ croa_plane_path = os.path.join(repo_root, "croa_plane")
 if croa_plane_path not in sys.path:
     sys.path.insert(0, croa_plane_path)
 
-os.environ["DEMO_CONTROL_SECRET"] = "test-secret"
+os.environ["DEMO_CONTROL_SECRET"] = "test-secret-unit-test"
 os.environ["INTERNAL_SERVICE_SECRET"] = "test-internal-secret"
 
 import c1_policy
@@ -32,14 +32,19 @@ from auth import get_authenticator, TokenRegistryAuthenticator
 
 def run_prospective_tests(evidence_output_path: str = None) -> Dict[str, Any]:
     # Route evidence and keys to host test paths to ensure zero modification to SUT source files
+    orig_evidence_file = c5_evidence.EVIDENCE_FILE
+    orig_key = c7_compiler.PRIVATE_KEY_PATH
     scratch_evidence_dir = os.path.join(repo_root, "tests", "conformance", "evidence", "prospective_red", "scratch")
     os.makedirs(scratch_evidence_dir, exist_ok=True)
     c5_evidence.EVIDENCE_FILE = os.path.join(scratch_evidence_dir, "red_run_evidence.jsonl")
     if os.path.exists(c5_evidence.EVIDENCE_FILE):
         os.remove(c5_evidence.EVIDENCE_FILE)
+    c5_evidence.reset_anchor_for_tests()
 
     # Point compiler to local private key path
     c7_compiler.PRIVATE_KEY_PATH = os.path.join(croa_plane_path, "private.pem")
+    if hasattr(c7_compiler, "reset_key_cache"):
+        c7_compiler.reset_key_cache()
 
     # Register prospective conformance test identity tokens in authenticator
     auth = get_authenticator()

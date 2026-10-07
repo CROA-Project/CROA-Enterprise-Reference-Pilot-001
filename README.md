@@ -1,104 +1,112 @@
-﻿# CROA Enterprise Reference Pilot #001
+# CROA Enterprise Reference Pilot #001
+
+[![CI](https://github.com/CROA-Project/CROA-Enterprise-Reference-Pilot-001/actions/workflows/ci.yml/badge.svg)](https://github.com/CROA-Project/CROA-Enterprise-Reference-Pilot-001/actions/workflows/ci.yml)
 
 ## Purpose
-Build a small, fully local, reproducible enterprise-style demonstration of the **Constrained Reachability Orchestration Architecture (CROA)**. 
-The objective is to demonstrate that an AI agent may propose actions, but execution authority remains completely outside the agent. This pilot demonstrates, within its modeled scenarios and documented trust assumptions, that legitimate actions are permitted, prohibited actions are denied, cumulative trajectories are enforced *before* execution, and that operations cannot execute without a cryptographically valid Execution Change Contract (ECC).
+A small, fully local, reproducible demonstration of the **Constrained Reachability Orchestration
+Architecture (CROA)**. An AI agent may *propose* actions; execution authority remains entirely outside
+the agent. Within its modeled scenarios and the trust assumptions documented below, the pilot
+demonstrates that legitimate actions are permitted, prohibited actions are denied, cumulative
+trajectories are enforced *before* execution, and no operation reaches the protected target without a
+cryptographically valid Execution Change Contract (ECC).
+
+This is an **author-operated reference pilot**: it is not a production implementation, a formal
+verification, or an independent validation of CROA.
 
 ## Architecture
-The pilot consists of four distinct containers simulating enterprise boundaries:
-- **ui**: Interactive HTML/JS demonstration interface (`localhost:8080`).
-- **croa_plane**: Houses C1 (Policy), C2 (Governor), C3 (Context Grounding), C4 (Trajectory Invariants), C5 (Evidence Logger), and C7 (Contract Compiler). Issues RS256 JWTs upon valid proposals.
-- **c6_firewall**: The Execution Firewall that sits on the boundary of the governed network. It evaluates ECCs independently, validates signatures, parameters, and protects against replays.
-- **acmeops_api**: A completely isolated fictitious enterprise system that represents the actual execution target.
+Four containers model the enterprise boundaries:
 
-*Note: C1, C2, C3, C4, C5, and C7 are co-located in one pilot container for implementation simplicity. This is a pilot deployment choice, not a CROA architectural requirement.*
+- **ui** — demonstration interface (`localhost:8080`).
+- **croa_plane** — C1 Policy, C2 Governor, C3 Context Grounding, C4 Trajectory Invariants,
+  C5 Evidence, C7 Contract Compiler. Issues RS256 ECCs. Holds the private key (runtime-mounted).
+- **c6_firewall** — the Execution Firewall on the governed-network boundary. Verifies ECCs
+  independently (signature, issuer, audience, key id, expiry, bindings, single redemption) and never
+  asks the control plane whether to execute.
+- **acmeops_api** — a simulated protected target on an isolated internal network. It authenticates
+  its firewall and is idempotent on `ecc_id`.
 
-## Quick Start
-1. Copy `.env.example` to `.env` and replace placeholder values.
-2. Generate pilot keys locally:
+Co-locating C1–C5 and C7 in one container is a pilot choice, not a CROA requirement.
+Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/TRUST-BOUNDARIES.md`](docs/TRUST-BOUNDARIES.md).
+
+## Quick start
 ```bash
-python scripts/generate_pilot_keys.py
+cp .env.example .env            # then replace BOTH secrets (≥12 chars; placeholders are rejected)
+python scripts/generate_pilot_keys.py   # writes ./keys/ (gitignored) and ./evidence_data/
+docker compose up --build --wait
+open http://localhost:8080
 ```
-3. Build and start the architecture:
-```bash
-docker compose up --build -d
-```
-4. Open the UI: [http://localhost:8080](http://localhost:8080)
+Demo-control functions (Reset, evidence view) prompt for `DEMO_CONTROL_SECRET`. This is a local
+operator convenience, not a security boundary.
 
-*Note: For demo-control functions (e.g. resetting evidence), the browser will prompt you for the DEMO_CONTROL_SECRET configured in your `.env` file. This represents a strictly local pilot capability, not a production security boundary.*
+## Demo scenarios
+| | Scenario | Stops at |
+|---|---|---|
+| A | Legitimate action | executes through C6 |
+| B | Unknown target | C3 (not registered) |
+| C | Forbidden action | C2 (policy) |
+| D | Cumulative trajectory — 3 × 40 records under a 100-record session limit | C4 blocks the third *before* an ECC exists |
+| E | Missing ECC | C6 |
+| F | Structurally invalid ECC | C6 (`INVALID_SIGNATURE`) — cryptographic forgeries are covered by the unit suite |
+| G | Mutated operation — authorized 40, execute 400 | C6 (`OPERATION_MISMATCH`) |
+| H | Replay | C6 (`ECC_ALREADY_REDEEMED`) |
 
-## Demo Scenarios
-The UI provides 8 pre-configured scenarios that interact directly with the live pilot containers:
-- **A — Legitimate Action**: Normal operation generating a valid ECC and executing.
-- **B — Unknown Target**: Fails at C3 context grounding (resource not registered).
-- **C — Forbidden Action**: Fails at C2 static policy check.
-- **D — Cumulative Trajectory**: Attempting 3 exports of 40 records under a 100-record session limit. The third request is blocked by C4 *before* an ECC is issued.
-- **E — Missing ECC**: Direct call to C6 without a contract is blocked.
-- **F — Forged ECC**: Invalidly signed contract is blocked by C6.
-- **G — Mutated Operation**: ECC issued for 40 records, but C6 is asked to execute 400. Blocked by payload binding mismatch.
-- **H — Replay Attempt**: Re-submitting an already redeemed valid ECC is blocked.
+## What the pilot demonstrates
+- Proposal and execution authority are separated by a cryptographic contract.
+- C6 admits only a valid, unexpired, unredeemed ECC whose signed commitment matches the presented
+  operation; the check is atomic under concurrent redemption.
+- Trajectory limits are reserved atomically at permit time, so concurrent proposals cannot
+  collectively exceed an invariant within one control-plane process.
+- The pre-execution authorization record is mandatory; if C5 cannot record it, nothing executes.
+- Execution outcomes are reported as `SUCCEEDED`, `FAILED` or `UNKNOWN`. C6 reconciles ambiguous
+  outcomes with the target by `ecc_id` and never records an outcome it did not observe.
+- Evidence is a hash-chained, self-anchored log that fails closed on corruption.
 
-## What the Pilot Demonstrates
-- Agent proposals are decoupled from execution.
-- Within the pilot's modeled scenarios and trust assumptions, C6 admits only operations carrying a valid, unexpired and unredeemed ECC whose signed commitment matches the requested operation.
-- Trajectory constraints (e.g. rate limits) are checked protectively on the control plane, preventing the generation of an ECC that would breach limits.
-- The C6 execution firewall is strictly stateless (except for replay caches) and does not rely on calling the control plane to make enforcement decisions.
-- A cryptographic tamper-evident C5 evidence hash chain logs all critical decisions.
+## What the pilot does NOT demonstrate
+- **Authenticated proposers.** `/propose` has no AuthN. `session_id` and `subject` are trusted inputs:
+  the C4 limit is enforced faithfully within the scope the caller names, and a caller can name a new
+  session. Subject binding in the ECC is a string match, not identity.
+- Distributed or multi-process safety. C4 state and the C6 replay registry are per-process, in memory;
+  run one worker per service. A C6 restart is handled by refusing pre-boot ECCs (ADR-0004); a
+  control-plane restart resets budgets.
+- Immutable evidence. C5 is tamper-evident and self-anchored while running; a file replaced between
+  restarts is not detectable without an external anchor.
+- Workload identity. Services authenticate with a shared secret; there is no TLS.
+- Signed policy lifecycle, policy conflict resolution, AQL, or a live LLM.
+- C6 independence *of availability*: C6 needs the control plane's evidence endpoint to execute.
 
-## What the Pilot Does NOT Demonstrate
-This is an author-operated reference pilot. It is not:
-- C1 is a static pilot realization of policy content, not full signed-policy lifecycle.
-- Agent Surface / AuthN / AQL are out of scope.
-- Subject binding is not identity authentication.
-- C5 is tamper-evident, not immutable.
-- C5 provenance is protected in the pilot by internal service authentication.
-- Replay cache is in-memory, single-node only.
-- C4 commit-at-permit simplification.
-- Cross-agent distributed trajectory safety is not demonstrated.
-- Distributed concurrency safety is not demonstrated.
+Full list and rationale: [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md); production replacements:
+[`docs/PRODUCTION-MAPPING.md`](docs/PRODUCTION-MAPPING.md); failure behaviour with the test that
+proves each: [`docs/FAILURE-MODES.md`](docs/FAILURE-MODES.md); contract format:
+[`docs/ECC-SPEC.md`](docs/ECC-SPEC.md); decisions: [`docs/adr/`](docs/adr/).
 
-## Security Model
-- **Network Isolation**: `acmeops_api` is on an internal docker network and publishes no ports. It cannot be reached directly by the UI or the `croa_plane`. Only `c6_firewall` has dual-network membership.
-- **Key Hygiene**: The `croa_plane` holds `private.pem`. `c6_firewall` only holds `public.pem`. The UI never sees the private key.
-- **Key Provisioning**: Keys are strictly local pilot artifacts. `private.pem` is never committed to version control. They are generated locally via `scripts/generate_pilot_keys.py`. This mechanism represents local pilot custody, not a production KMS/HSM.
-
-## Known Limitations
-- The C5 hash chain is a simplified local JSONL implementation.
-- Pilot simplification: trajectory budget is reserved/committed at permit time rather than target commit time. As a result, unused ECCs may still consume trajectory budget.
-- Replay protection (Nonces) are currently kept in memory within C6; production would require distributed caching (e.g., Redis).
-- Live LLM dependencies are omitted in favor of predetermined demonstration payloads.
+## Security model (pilot)
+- **Network isolation:** `acmeops_api` is on an `internal` Docker network with no published ports.
+  Only `c6_firewall` is dual-homed.
+- **Target authentication:** AcmeOps rejects any `/internal/*` call without the internal service secret.
+- **Key custody:** `keys/private.pem` is mounted read-only into `croa_plane`; `keys/public.pem` into
+  `c6_firewall`. Neither is committed or built into an image. This is local pilot custody, not KMS/HSM.
+- **Containers:** non-root, read-only root filesystem, all capabilities dropped, health-checked,
+  memory/CPU limited, single worker.
 
 ## Evidence
-The pilot implements C5 using a persistent SHA-256 hash-chained JSONL evidence log. This provides tamper-evidence for demonstration purposes; it is not a production immutable ledger. Evidence of governance is written chronologically to `evidence_data/evidence.jsonl`. The UI live-tails this file and automatically verifies the chain validity.
+`evidence_data/evidence.jsonl` is a SHA-256 hash-chained JSONL log written by C5 alone. The UI
+live-tails it through the API and shows chain validity. `decision` is the *authorization* outcome;
+`execution_status` is the *target* outcome; `claims_verified: false` marks records whose ECC claims
+could not be authenticated.
 
-## How to Reset
-In the UI, click **Reset Demo**. This will:
-1. Reset the in-memory trajectory counters on `croa_plane`.
-2. Clear the used-nonce cache on `c6_firewall`.
-3. Clear the execution history on `acmeops_api`.
-4. Log a `DEMO_RESET` event to the `evidence_data/evidence.jsonl` log to maintain audibility of the reset operation.
+## Reset
+**Reset Demo** in the UI clears trajectory counters, the replay registry and AcmeOps history, and
+writes a `DEMO_RESET` record to the evidence chain (the reset itself is auditable).
 
-## How to Run Tests
-The automated test scripts are stored in the `tests/` directory. They can be executed by piping them directly into the Python environment of the containers, which have the correct network resolution.
-
-### Normal Runtime Tests
-These tests assert behavior in the standard environment:
+## Tests
 ```bash
-# Phase 5 Automated UI Scenarios
-cat tests/test_phase5.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
-
-# Hardening / Adversarial Scenarios
-cat tests/test_hardening.py | docker exec -i croa-pilot-001-croa_plane-1 python -
-
-# Prove TTL manipulation is blocked
-cat tests/test_ttl_enforcement.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
+pip install -r requirements-dev.txt
+pytest -q                     # in-process suite: concurrency, forgery, replay, lost responses, corruption
+scripts/run_regression.sh     # scenario harness against the compose stack (normal + test mode)
 ```
+The in-process suite needs no Docker. The compose harness pipes the scripts in `tests/` into the running
+containers; `docker-compose.test.yml` enables clock/TTL overrides and fault injection and must never be
+used for demonstrations. CI runs both.
 
-### Test Mode Execution
-To run tests that require internal clock/TTL overrides (like the expiration test), you must explicitly restart the plane in test mode:
-```bash
-docker compose -f docker-compose.yml -f docker-compose.test.yml up -d
-cat tests/test_phase4.py | docker exec -i croa-pilot-001-c6_firewall-1 python -
-docker compose down
-docker compose up -d
-```
+## Versioning
+See [`CHANGELOG.md`](CHANGELOG.md). `v0.1.x` releases predate the hardening described there.

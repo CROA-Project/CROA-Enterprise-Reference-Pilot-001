@@ -136,7 +136,7 @@ def test_malformed_ecc():
     # A. missing nonce
     # Generate a valid token without nonce
     import jwt
-    with open('private.pem', 'rb') as kf:
+    with open(os.environ.get('CROA_PRIVATE_KEY_PATH', '/app/keys/private.pem'), 'rb') as kf:
         private_key = kf.read()
     
     payload_a = {

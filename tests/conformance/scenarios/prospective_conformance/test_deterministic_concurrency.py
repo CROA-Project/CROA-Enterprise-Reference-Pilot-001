@@ -11,7 +11,7 @@ croa_plane_path = os.path.join(repo_root, "croa_plane")
 if croa_plane_path not in sys.path:
     sys.path.insert(0, croa_plane_path)
 
-os.environ["DEMO_CONTROL_SECRET"] = "test-secret"
+os.environ["DEMO_CONTROL_SECRET"] = "test-secret-unit-test"
 os.environ["INTERNAL_SERVICE_SECRET"] = "test-internal-secret"
 
 import c1_policy
@@ -23,13 +23,18 @@ from auth import get_authenticator, TokenRegistryAuthenticator
 
 def test_deterministic_concurrency_serialization():
     # Setup paths
+    orig_evidence_file = c5_evidence.EVIDENCE_FILE
+    orig_key = c7_compiler.PRIVATE_KEY_PATH
     scratch_dir = os.path.join(repo_root, "tests", "conformance", "evidence", "prospective_green", "scratch")
     os.makedirs(scratch_dir, exist_ok=True)
     c5_evidence.EVIDENCE_FILE = os.path.join(scratch_dir, "concurrency_test_evidence.jsonl")
     if os.path.exists(c5_evidence.EVIDENCE_FILE):
         os.remove(c5_evidence.EVIDENCE_FILE)
+    c5_evidence.reset_anchor_for_tests()
 
     c7_compiler.PRIVATE_KEY_PATH = os.path.join(croa_plane_path, "private.pem")
+    if hasattr(c7_compiler, "reset_key_cache"):
+        c7_compiler.reset_key_cache()
 
     auth = get_authenticator()
     if isinstance(auth, TokenRegistryAuthenticator):
@@ -84,8 +89,13 @@ def test_deterministic_concurrency_serialization():
     t_a.join()
     t_b.join()
 
-    # Restore policy
+    # Restore policy and paths
     c1_policy.INVARIANTS = orig_invariants
+    c5_evidence.EVIDENCE_FILE = orig_evidence_file
+    c5_evidence.reset_anchor_for_tests()
+    c7_compiler.PRIVATE_KEY_PATH = orig_key
+    if hasattr(c7_compiler, "reset_key_cache"):
+        c7_compiler.reset_key_cache()
 
     dec_a = results["A"].get("decision")
     dec_b = results["B"].get("decision")

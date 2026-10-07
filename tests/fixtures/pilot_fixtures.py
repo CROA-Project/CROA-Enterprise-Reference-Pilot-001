@@ -103,6 +103,7 @@ def setup_pilot_fixtures():
     _orig_evidence_file = c5_evidence.EVIDENCE_FILE
     _temp_dir = tempfile.mkdtemp(prefix="croa_evidence_")
     c5_evidence.EVIDENCE_FILE = os.path.join(_temp_dir, "evidence.jsonl")
+    c5_evidence.reset_anchor_for_tests()
 
     # Register schemas
     for action, schema in PILOT_SCHEMAS.items():
@@ -167,7 +168,7 @@ def teardown_pilot_fixtures():
         if repo_root not in sys.path:
             sys.path.insert(0, repo_root)
         if "DEMO_CONTROL_SECRET" not in os.environ:
-            os.environ["DEMO_CONTROL_SECRET"] = "test-secret"
+            os.environ["DEMO_CONTROL_SECRET"] = "test-secret-unit-test"
         if "INTERNAL_SERVICE_SECRET" not in os.environ:
             os.environ["INTERNAL_SERVICE_SECRET"] = "test-internal-secret"
         import c6_firewall.main as c6_main
@@ -177,6 +178,7 @@ def teardown_pilot_fixtures():
 
     if _orig_evidence_file:
         c5_evidence.EVIDENCE_FILE = _orig_evidence_file
+        c5_evidence.reset_anchor_for_tests()
         _orig_evidence_file = None
 
     if _temp_dir and os.path.exists(_temp_dir):
