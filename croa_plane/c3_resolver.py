@@ -7,12 +7,73 @@ Fails closed with TARGET_NOT_REGISTERED or TARGET_TYPE_MISMATCH.
 Zero domain-specific pricing or external pilot fixtures in generic baseline.
 """
 
+from __future__ import annotations
+
+import json
+import os
+
+
+def _load_env_if_present() -> None:
+    for candidate in [
+        os.path.join(os.path.dirname(__file__), "..", ".env"),
+        os.path.join(os.getcwd(), ".env"),
+    ]:
+        if os.path.exists(candidate):
+            try:
+                with open(candidate, encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip().lstrip("\ufeff")
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip("'\"")
+                            if k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+            break
+
+
+_load_env_if_present()
+
+
+def load_context_targets_from_env(registry: ContextRegistry | None = None) -> ContextRegistry:
+    """
+    Loads additional context targets from CROA_CONTEXT_TARGETS environment variable if set.
+    Fails closed with ValueError on malformed JSON, non-dict structure, or invalid keys/values.
+    """
+    reg = registry if registry is not None else ContextRegistry()
+    raw = os.environ.get("CROA_CONTEXT_TARGETS")
+    if raw is None:
+        return reg
+    raw_str = raw.strip()
+    if not raw_str:
+        return reg
+
+    try:
+        data = json.loads(raw_str)
+    except Exception as exc:
+        raise ValueError(f"MALFORMED_CONTEXT_TARGETS_CONFIG: Invalid JSON: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError("MALFORMED_CONTEXT_TARGETS_CONFIG: CROA_CONTEXT_TARGETS must be a JSON object")
+
+    for k, v in data.items():
+        if not isinstance(k, str) or not k.strip():
+            raise ValueError("MALFORMED_CONTEXT_TARGETS_CONFIG: Target ID must be a non-empty string")
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("MALFORMED_CONTEXT_TARGETS_CONFIG: Target type must be a non-empty string")
+        reg.register_target(k.strip(), v.strip())
+
+    return reg
+
 
 class ContextRegistry:
     def __init__(self):
         self._registry: dict[str, str] = {}
         self._action_target_types: dict[str, str] = {}
         self._init_defaults()
+        load_context_targets_from_env(self)
 
     def _init_defaults(self):
         self._registry = {

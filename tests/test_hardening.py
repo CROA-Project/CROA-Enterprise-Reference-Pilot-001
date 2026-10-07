@@ -6,8 +6,16 @@ import time
 import jwt
 import threading
 
-CROA_URL = "http://localhost:8000"
-C6_URL = "http://c6_firewall:8000"
+CROA_URL = os.environ.get("CROA_URL", "http://localhost:8000")
+C6_URL = os.environ.get("C6_URL", "http://c6_firewall:8000")
+
+PILOT_TOKEN_AGENT_1 = os.environ.get("PILOT_AGENT_TOKEN", "pilot-token-agent-1")
+PILOT_TOKEN_ALICE = os.environ.get("PILOT_TOKEN_ALICE", "pilot-token-alice")
+PILOT_TOKEN_BOB = os.environ.get("PILOT_TOKEN_BOB", "pilot-token-bob")
+
+AUTH_AGENT1 = {"Authorization": f"Bearer {PILOT_TOKEN_AGENT_1}"}
+AUTH_ALICE = {"Authorization": f"Bearer {PILOT_TOKEN_ALICE}"}
+AUTH_BOB = {"Authorization": f"Bearer {PILOT_TOKEN_BOB}"}
 
 results = {}
 passed_all = True
@@ -43,7 +51,7 @@ def test_replay_after_unauth_reset():
         "action": "export_customers",
         "target": "endpoint:analytics.internal",
         "parameters": {"count": 10}
-    }).json()
+    }, headers=AUTH_ALICE).json()
     
     ecc = p_resp.get("ecc")
     r1 = httpx.post(f"{C6_URL}/execute", json={
@@ -89,7 +97,7 @@ def test_subject_isolation():
         "action": "export_customers",
         "target": "endpoint:analytics.internal",
         "parameters": {"count": 50}
-    })
+    }, headers=AUTH_ALICE)
     
     r_alice = httpx.post(f"{CROA_URL}/propose", json={
         "request_id": str(uuid.uuid4()),
@@ -98,7 +106,7 @@ def test_subject_isolation():
         "action": "export_customers",
         "target": "endpoint:analytics.internal",
         "parameters": {"count": 60}
-    }).json() # total 110 > 100 limit
+    }, headers=AUTH_ALICE).json() # total 110 > 100 limit
     
     r_bob = httpx.post(f"{CROA_URL}/propose", json={
         "request_id": str(uuid.uuid4()),
@@ -107,7 +115,7 @@ def test_subject_isolation():
         "action": "export_customers",
         "target": "endpoint:analytics.internal",
         "parameters": {"count": 60}
-    }).json() # bob's total 60 < 100
+    }, headers=AUTH_BOB).json() # bob's total 60 < 100
     
     report("TEST-F: Subject isolation in trajectory", r_alice.get("decision") == "DENY" and r_bob.get("decision") == "PERMIT")
 
@@ -123,7 +131,7 @@ def test_ttl_control():
         "target": "endpoint:analytics.internal",
         "parameters": {"count": 10},
         "expiry_seconds": 999999
-    }).json()
+    }, headers=AUTH_ALICE).json()
     
     ecc = r.get("ecc")
     payload = jwt.decode(ecc, options={"verify_signature": False})
@@ -219,7 +227,7 @@ def test_refusal_gateway():
         "action": "get_customer",
         "target": "unknown:xyz",
         "parameters": {}
-    }).json()
+    }, headers=AUTH_ALICE).json()
     
     r_c2 = httpx.post(f"{CROA_URL}/propose", json={
         "request_id": str(uuid.uuid4()),
@@ -228,7 +236,7 @@ def test_refusal_gateway():
         "action": "change_config",
         "target": "environment:prod",
         "parameters": {}
-    }).json()
+    }, headers=AUTH_ALICE).json()
     
     c3_pass = r_c3.get("decision") == "DENY" and r_c3.get("decision_stage") == "C6_REFUSAL_GATEWAY"
     c2_pass = r_c2.get("decision") == "DENY" and r_c2.get("decision_stage") == "C6_REFUSAL_GATEWAY"
@@ -247,7 +255,7 @@ def test_acmeops_not_reached():
         "action": "change_config",
         "target": "environment:prod",
         "parameters": {}
-    }).json()
+    }, headers=AUTH_ALICE).json()
 
     hist = httpx.get(f"{C6_URL}/acmeops/history", headers=headers).json()
     report("TEST-M: AcmeOps not reached on refusal", len(hist) == 0)
@@ -281,7 +289,7 @@ def test_c5_fault_injection_modes():
     success = (r_auth.status_code == 200)
     
     try:
-        r = httpx.post(f"{CROA_URL}/propose", json={"request_id": "c5-1", "session_id": "sess-c5", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}}).json()
+        r = httpx.post(f"{CROA_URL}/propose", json={"request_id": "c5-1", "session_id": "sess-c5", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}}, headers=AUTH_AGENT1).json()
         h_before = len(httpx.get(f"{C6_URL}/acmeops/history", headers=get_demo_secret_headers()).json())
         x = httpx.post(f"{C6_URL}/execute", json={"ecc": r["ecc"], "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}}).json()
         h_after = len(httpx.get(f"{C6_URL}/acmeops/history", headers=get_demo_secret_headers()).json())

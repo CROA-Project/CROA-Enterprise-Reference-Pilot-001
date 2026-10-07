@@ -24,6 +24,7 @@ def run_ttl_enforcement_test():
             time.sleep(0.5)
     
     try:
+        pilot_token = os.environ.get("PILOT_AGENT_TOKEN", "pilot-token-agent-1")
         # Request an expiry of 1 second from the normal runtime
         r = httpx.post("http://127.0.0.1:8008/propose", json={
             "request_id": "test-ttl",
@@ -33,7 +34,7 @@ def run_ttl_enforcement_test():
             "target": "customer:342",
             "parameters": {},
             "expiry_seconds": 1
-        })
+        }, headers={"Authorization": f"Bearer {pilot_token}"})
         
         if r.status_code != 200:
             print(f"FAIL: Proposal failed with {r.status_code}")

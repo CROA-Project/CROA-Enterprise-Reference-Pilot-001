@@ -1,8 +1,11 @@
 import httpx
 import json
+import os
 import sys
 
 CROA_URL = "http://localhost:8000/propose"
+PILOT_AGENT_TOKEN = os.environ.get("PILOT_AGENT_TOKEN", "pilot-token-agent-1")
+AUTH_HEADERS = {"Authorization": f"Bearer {PILOT_AGENT_TOKEN}"}
 
 PHASE2_TESTS = [
     {"name": "TEST-01", "payload": {"request_id": "req-01", "session_id": "s1", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}}, "expected_decision": "PERMIT", "expected_reason": "POLICY_ALLOWED"},
@@ -35,7 +38,7 @@ def run_tests():
         # Phase 2 tests
         for t in PHASE2_TESTS:
             try:
-                resp = client.post(CROA_URL, json=t["payload"])
+                resp = client.post(CROA_URL, json=t["payload"], headers=AUTH_HEADERS)
                 resp.raise_for_status()
                 data = resp.json()
                 
@@ -52,9 +55,15 @@ def run_tests():
                 passed_all = False
                 
         # Phase 3 tests
+        demo_secret = os.environ.get("DEMO_CONTROL_SECRET")
+        if demo_secret:
+            client.post("http://localhost:8000/reset", json={"demo_run_id": "phase3-reset"}, headers={"X-Demo-Control-Secret": demo_secret})
+
         for t in PHASE3_TESTS:
+            if t["name"] == "TEST-C4-06" and demo_secret:
+                client.post("http://localhost:8000/reset", json={"demo_run_id": "c4-06-reset"}, headers={"X-Demo-Control-Secret": demo_secret})
             try:
-                resp = client.post(CROA_URL, json=t["payload"])
+                resp = client.post(CROA_URL, json=t["payload"], headers=AUTH_HEADERS)
                 resp.raise_for_status()
                 data = resp.json()
                 

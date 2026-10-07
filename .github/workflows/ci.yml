@@ -43,7 +43,7 @@ jobs:
       - name: Bootstrap keys and secrets
         run: |
           python scripts/generate_pilot_keys.py
-          printf 'DEMO_CONTROL_SECRET=%s\nINTERNAL_SERVICE_SECRET=%s\nECC_TTL_SECONDS=300\n' \
+          printf 'DEMO_CONTROL_SECRET=%s\nINTERNAL_SERVICE_SECRET=%s\nECC_TTL_SECONDS=300\nCROA_SUBJECT_TOKENS={"pilot-token-agent-1":"agent:1","pilot-token-alice":"alice","pilot-token-bob":"bob"}\nPILOT_AGENT_TOKEN=pilot-token-agent-1\nCROA_CONTEXT_TARGETS={"customer:342":"customer"}\n' \
             "$(python -c 'import secrets;print(secrets.token_urlsafe(24))')" \
             "$(python -c 'import secrets;print(secrets.token_urlsafe(24))')" > .env
       - name: Build and start (normal mode)

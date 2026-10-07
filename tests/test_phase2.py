@@ -1,8 +1,11 @@
+import os
 import httpx
 import json
 import sys
 
 CROA_URL = "http://localhost:8000/propose"
+PILOT_AGENT_TOKEN = os.environ.get("PILOT_AGENT_TOKEN", "pilot-token-agent-1")
+AUTH_HEADERS = {"Authorization": f"Bearer {PILOT_AGENT_TOKEN}"}
 
 TESTS = [
     {
@@ -63,7 +66,7 @@ def run_tests():
             try:
                 # We will run this inside the c6_firewall container which has httpx installed.
                 # So we hit croa_plane:8000 directly
-                resp = client.post("http://croa_plane:8000/propose", json=t["payload"])
+                resp = client.post("http://croa_plane:8000/propose", json=t["payload"], headers=AUTH_HEADERS)
                 resp.raise_for_status()
                 data = resp.json()
                 

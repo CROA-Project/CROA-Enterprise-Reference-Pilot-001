@@ -7,9 +7,68 @@ Zero test identities or implicit test-mode prefix bypasses embedded in core logi
 Strict fail-closed behavior on missing or unverified credentials.
 """
 
+from __future__ import annotations
+
+import json
+import os
 from abc import ABC, abstractmethod
 
 from fastapi import HTTPException
+
+
+def _load_env_if_present() -> None:
+    for candidate in [
+        os.path.join(os.path.dirname(__file__), "..", ".env"),
+        os.path.join(os.getcwd(), ".env"),
+    ]:
+        if os.path.exists(candidate):
+            try:
+                with open(candidate, encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip().lstrip("\ufeff")
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip("'\"")
+                            if k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+            break
+
+
+_load_env_if_present()
+
+
+def load_subject_tokens_from_env(authenticator: TokenRegistryAuthenticator | None = None) -> TokenRegistryAuthenticator:
+    """
+    Loads subject tokens from CROA_SUBJECT_TOKENS environment variable if set.
+    Fails closed with ValueError on malformed JSON, non-dict structure, or invalid keys/values.
+    """
+    auth = authenticator if authenticator is not None else TokenRegistryAuthenticator()
+    raw = os.environ.get("CROA_SUBJECT_TOKENS")
+    if raw is None:
+        return auth
+    raw_str = raw.strip()
+    if not raw_str:
+        return auth
+
+    try:
+        data = json.loads(raw_str)
+    except Exception as exc:
+        raise ValueError(f"MALFORMED_SUBJECT_TOKENS_CONFIG: Invalid JSON: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError("MALFORMED_SUBJECT_TOKENS_CONFIG: CROA_SUBJECT_TOKENS must be a JSON object")
+
+    for k, v in data.items():
+        if not isinstance(k, str) or not k.strip():
+            raise ValueError("MALFORMED_SUBJECT_TOKENS_CONFIG: Token key must be a non-empty string")
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("MALFORMED_SUBJECT_TOKENS_CONFIG: Subject value must be a non-empty string")
+        auth.register_token(k.strip(), v.strip())
+
+    return auth
 
 
 class SubjectAuthenticator(ABC):
@@ -32,6 +91,7 @@ class TokenRegistryAuthenticator(SubjectAuthenticator):
 
     def __init__(self, token_to_subject: dict[str, str] | None = None):
         self._registry: dict[str, str] = dict(token_to_subject or {})
+        load_subject_tokens_from_env(self)
 
     def register_token(self, token: str, subject: str) -> None:
         """Registers a valid token and its bound subject identity."""

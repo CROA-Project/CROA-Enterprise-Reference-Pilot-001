@@ -5,6 +5,8 @@ import time
 
 CROA_URL = "http://croa_plane:8000"
 C6_URL = "http://c6_firewall:8000"
+PILOT_AGENT_TOKEN = os.environ.get("PILOT_AGENT_TOKEN", "pilot-token-agent-1")
+AUTH_HEADERS = {"Authorization": f"Bearer {PILOT_AGENT_TOKEN}"}
 
 def get_history(client):
     try:
@@ -28,7 +30,7 @@ def run_tests():
             h_before = len(get_history(client))
             r = client.post(f"{CROA_URL}/propose", json={
                 "request_id": f"{run_id}-A", "session_id": f"sess-{run_id}", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}
-            }).json()
+            }, headers=AUTH_HEADERS).json()
             x = client.post(f"{C6_URL}/execute", json={
                 "ecc": r["ecc"], "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}
             }).json()
@@ -48,7 +50,7 @@ def run_tests():
             h_before = len(get_history(client))
             r = client.post(f"{CROA_URL}/propose", json={
                 "request_id": f"{run_id}-B", "session_id": f"sess-{run_id}", "subject": "agent:1", "action": "get_customer", "target": "customer:999", "parameters": {}
-            }).json()
+            }, headers=AUTH_HEADERS).json()
             h_after = len(get_history(client))
             if r["decision_stage"] in ["C3", "C6_REFUSAL_GATEWAY"] and r["decision"] == "DENY" and h_before == h_after:
                 results["Scenario B"] = "PASS"
@@ -64,7 +66,7 @@ def run_tests():
             h_before = len(get_history(client))
             r = client.post(f"{CROA_URL}/propose", json={
                 "request_id": f"{run_id}-C", "session_id": f"sess-{run_id}", "subject": "agent:1", "action": "delete_environment", "target": "environment:dev", "parameters": {}
-            }).json()
+            }, headers=AUTH_HEADERS).json()
             h_after = len(get_history(client))
             if r["decision_stage"] in ["C2", "C6_REFUSAL_GATEWAY"] and r["decision"] == "DENY" and h_before == h_after:
                 results["Scenario C"] = "PASS"
@@ -85,11 +87,11 @@ def run_tests():
                 {"request_id": f"{run_id}-D3", "session_id": sess, "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}}
             ]
             
-            p1 = client.post(f"{CROA_URL}/propose", json=reqs[0]).json()
+            p1 = client.post(f"{CROA_URL}/propose", json=reqs[0], headers=AUTH_HEADERS).json()
             client.post(f"{C6_URL}/execute", json={"ecc": p1["ecc"], **reqs[0]})
-            p2 = client.post(f"{CROA_URL}/propose", json=reqs[1]).json()
+            p2 = client.post(f"{CROA_URL}/propose", json=reqs[1], headers=AUTH_HEADERS).json()
             client.post(f"{C6_URL}/execute", json={"ecc": p2["ecc"], **reqs[1]})
-            p3 = client.post(f"{CROA_URL}/propose", json=reqs[2]).json()
+            p3 = client.post(f"{CROA_URL}/propose", json=reqs[2], headers=AUTH_HEADERS).json()
             
             h_after = len(get_history(client))
             if p3["decision_stage"] in ["C4", "C6_REFUSAL_GATEWAY"] and p3["decision"] == "DENY" and (h_after - h_before) == 2:
@@ -124,7 +126,7 @@ def run_tests():
             h_before = len(get_history(client))
             r = client.post(f"{CROA_URL}/propose", json={
                 "request_id": f"{run_id}-F", "session_id": f"sess-{run_id}", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}
-            }).json()
+            }, headers=AUTH_HEADERS).json()
             x = client.post(f"{C6_URL}/execute", json={
                 "ecc": r["ecc"] + ".forged", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}
             }).json()
@@ -140,10 +142,12 @@ def run_tests():
 
         # Scenario G
         try:
+            client.post(f"{CROA_URL}/reset", json={"demo_run_id": f"{run_id}-G-reset"}, headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]})
+            client.post(f"{C6_URL}/reset", headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]})
             h_before = len(get_history(client))
             r = client.post(f"{CROA_URL}/propose", json={
                 "request_id": f"{run_id}-G", "session_id": f"sess-{run_id}", "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}
-            }).json()
+            }, headers=AUTH_HEADERS).json()
             x = client.post(f"{C6_URL}/execute", json={
                 "ecc": r["ecc"], "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 400}
             }).json()
@@ -159,10 +163,12 @@ def run_tests():
 
         # Scenario H
         try:
+            client.post(f"{CROA_URL}/reset", json={"demo_run_id": f"{run_id}-H-reset"}, headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]})
+            client.post(f"{C6_URL}/reset", headers={"X-Demo-Control-Secret": os.environ["DEMO_CONTROL_SECRET"]})
             h_before = len(get_history(client))
             r = client.post(f"{CROA_URL}/propose", json={
                 "request_id": f"{run_id}-H", "session_id": f"sess-{run_id}", "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}
-            }).json()
+            }, headers=AUTH_HEADERS).json()
             x1 = client.post(f"{C6_URL}/execute", json={
                 "ecc": r["ecc"], "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}
             }).json()

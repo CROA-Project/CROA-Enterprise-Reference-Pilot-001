@@ -57,6 +57,9 @@ services:
       ECC_TTL_SECONDS: ${ECC_TTL_SECONDS:-300}
       ECC_ISSUER: ${ECC_ISSUER:-croa-plane-pilot}
       ECC_AUDIENCE: ${ECC_AUDIENCE:-c6-firewall-pilot}
+      CROA_SUBJECT_TOKENS: ${CROA_SUBJECT_TOKENS:-}
+      CROA_CONTEXT_TARGETS: ${CROA_CONTEXT_TARGETS:-}
+      PILOT_AGENT_TOKEN: ${PILOT_AGENT_TOKEN:-}
 
   c6_firewall:
     <<: *hardening
@@ -74,6 +77,7 @@ services:
       ECC_ISSUER: ${ECC_ISSUER:-croa-plane-pilot}
       ECC_AUDIENCE: ${ECC_AUDIENCE:-c6-firewall-pilot}
       C6_TARGET_TIMEOUT_SECONDS: ${C6_TARGET_TIMEOUT_SECONDS:-5}
+      PILOT_AGENT_TOKEN: ${PILOT_AGENT_TOKEN:-}
     depends_on:
       croa_plane:
         condition: service_healthy

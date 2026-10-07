@@ -6,6 +6,8 @@ import time
 CROA_URL = "http://localhost:8000/propose"
 C6_URL = "http://localhost:8000/execute" # When run in c6 container, it will hit its own execute endpoint
 ACMEOPS_HISTORY_URL = "http://acmeops_api:8000/internal/history"
+PILOT_AGENT_TOKEN = os.environ.get("PILOT_AGENT_TOKEN", "pilot-token-agent-1")
+AUTH_HEADERS = {"Authorization": f"Bearer {PILOT_AGENT_TOKEN}"}
 
 def get_acmeops_history(client):
     # AcmeOps authenticates its firewall: /internal/* requires the internal service secret (v0.2.0).
@@ -22,7 +24,7 @@ def run_tests():
             h_before = len(get_acmeops_history(client))
             resp = client.post("http://croa_plane:8000/propose", json={
                 "request_id": "req-ecc-01", "session_id": f"s-ecc-{int(time.time()*1000)}", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}
-            })
+            }, headers=AUTH_HEADERS)
             ecc_data = resp.json()
             ecc_token = ecc_data.get("ecc")
             
@@ -79,7 +81,7 @@ def run_tests():
         # Generate a base ECC for mutations
         resp = client.post("http://croa_plane:8000/propose", json={
             "request_id": "req-ecc-mut", "session_id": f"s-ecc-{int(time.time()*1000)}", "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}
-        })
+        }, headers=AUTH_HEADERS)
         base_ecc = resp.json().get("ecc")
 
         # TEST-ECC-04 Parameter Mutation
@@ -174,7 +176,7 @@ def run_tests():
 
         # TEST-ECC-09 Expired ECC
         try:
-            resp = client.post("http://croa_plane:8000/propose", headers={"X-Test-Expiry-Seconds": "1"}, json={
+            resp = client.post("http://croa_plane:8000/propose", headers={**AUTH_HEADERS, "X-Test-Expiry-Seconds": "1"}, json={
                 "request_id": "req-ecc-exp", "session_id": f"s-ecc-{int(time.time()*1000)}", "subject": "agent:1", "action": "get_customer", "target": "customer:342", "parameters": {}, "expiry_seconds": 1
             })
             exp_ecc = resp.json().get("ecc")
@@ -198,7 +200,7 @@ def run_tests():
         try:
             resp = client.post("http://croa_plane:8000/propose", json={
                 "request_id": "req-ecc-10", "session_id": f"s-ecc-{int(time.time()*1000)}", "subject": "agent:1", "action": "delete_environment", "target": "environment:dev", "parameters": {}
-            })
+            }, headers=AUTH_HEADERS)
             if resp.json().get("ecc") is None:
                 results["TEST-ECC-10"] = "PASS"
             else:
@@ -210,17 +212,21 @@ def run_tests():
 
         # Trajectory + Execution Test
         try:
+            demo_secret = os.environ.get("DEMO_CONTROL_SECRET")
+            if demo_secret:
+                client.post("http://croa_plane:8000/reset", json={"demo_run_id": f"traj-{int(time.time())}"}, headers={"X-Demo-Control-Secret": demo_secret})
+                client.post("http://localhost:8000/reset", headers={"X-Demo-Control-Secret": demo_secret})
             h_before = get_acmeops_history(client)
             exp_before = sum([x["parameters"]["count"] for x in h_before if x["action"] == "export_customers" and "count" in x["parameters"]])
             sid = "s-traj-" + str(time.time())
             # 1
-            r1 = client.post("http://croa_plane:8000/propose", json={"request_id": "r1", "session_id": sid, "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}}).json()
+            r1 = client.post("http://croa_plane:8000/propose", json={"request_id": "r1", "session_id": sid, "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}}, headers=AUTH_HEADERS).json()
             client.post("http://localhost:8000/execute", json={"ecc": r1["ecc"], "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}})
             # 2
-            r2 = client.post("http://croa_plane:8000/propose", json={"request_id": "r2", "session_id": sid, "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}}).json()
+            r2 = client.post("http://croa_plane:8000/propose", json={"request_id": "r2", "session_id": sid, "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}}, headers=AUTH_HEADERS).json()
             client.post("http://localhost:8000/execute", json={"ecc": r2["ecc"], "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}})
             # 3
-            r3 = client.post("http://croa_plane:8000/propose", json={"request_id": "r3", "session_id": sid, "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}}).json()
+            r3 = client.post("http://croa_plane:8000/propose", json={"request_id": "r3", "session_id": sid, "subject": "agent:1", "action": "export_customers", "target": "endpoint:analytics.internal", "parameters": {"count": 40}}, headers=AUTH_HEADERS).json()
             
             h = get_acmeops_history(client)
             # count exports in history
