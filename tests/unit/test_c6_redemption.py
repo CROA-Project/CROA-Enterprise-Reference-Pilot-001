@@ -11,6 +11,7 @@ Scope: In-memory single-process Reference Harness (InMemoryRedemptionStore).
 import os
 import sys
 import threading
+from typing import Any
 
 import httpx
 import pytest
@@ -29,19 +30,26 @@ os.environ["INTERNAL_SERVICE_SECRET"] = "test-internal-secret"
 
 import c7_compiler  # noqa: E402
 
-import c6_firewall.main as c6_mod  # noqa: E402
-from c6_firewall.main import app as c6_app  # noqa: E402
-from c6_firewall.main import default_redemption_store  # noqa: E402
+c6_mod: Any = None
+c6_app: Any = None
+default_redemption_store: Any = None
 
 
 @pytest.fixture(autouse=True)
-def setup_c6_environment(monkeypatch):
+def setup_c6_environment(services, monkeypatch):
     """
     Hermetic test fixture for in-process C6 firewall testing:
+    - Obtains C6 module/app/store from hermetic ephemeral-key services fixture
     - Resets default redemption store
     - Mocks evidence logging to avoid external HTTP dependency
     - Instruments upstream execution POST calls to track upstream execution count
     """
+    global c6_mod, c6_app, default_redemption_store
+
+    c6_mod = services["c6"]
+    c6_app = c6_mod.app
+    default_redemption_store = c6_mod.default_redemption_store
+
     default_redemption_store.clear()
 
     upstream_calls = []
