@@ -24,7 +24,11 @@ jobs:
       - name: Unit tests (in-process, mocked transport, fault injection)
         run: pytest -q
       - name: Dependency audit (application requirements)
-        run: pip-audit -r croa_plane/requirements.txt -r acmeops_api/requirements.txt
+        run: |
+          pip-audit \
+            -r croa_plane/requirements.txt \
+            -r c6_firewall/requirements.txt \
+            -r acmeops_api/requirements.txt
 
   compose-integration:
     name: Compose stack + scenario harness
