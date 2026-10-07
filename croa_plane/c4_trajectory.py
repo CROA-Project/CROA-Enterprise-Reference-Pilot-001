@@ -9,11 +9,12 @@ Provides reserve_trajectory(...) compatibility API delegating directly to canoni
 """
 
 import threading
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Any
+
 import c1_policy
 
 # Module-level invariants override (for monkeypatching in unit tests)
-INVARIANTS: Optional[List[Dict[str, Any]]] = None
+INVARIANTS: list[dict[str, Any]] | None = None
 
 
 class InMemoryTrajectoryStore:
@@ -21,8 +22,9 @@ class InMemoryTrajectoryStore:
     Thread-safe in-memory store for trajectory accumulation state.
     Reference harness single-process implementation only.
     """
+
     def __init__(self):
-        self._state: Dict[str, int] = {}
+        self._state: dict[str, int] = {}
         self._lock = threading.RLock()
 
     @property
@@ -30,7 +32,7 @@ class InMemoryTrajectoryStore:
         return self._lock
 
     @property
-    def state(self) -> Dict[str, int]:
+    def state(self) -> dict[str, int]:
         return self._state
 
     def get(self, key: str, default: int = 0) -> int:
@@ -48,7 +50,7 @@ class InMemoryTrajectoryStore:
 
 # Global default store instance for reference harness
 default_trajectory_store = InMemoryTrajectoryStore()
-trajectory_state: Dict[str, int] = default_trajectory_store.state
+trajectory_state: dict[str, int] = default_trajectory_store.state
 _trajectory_lock: threading.RLock = default_trajectory_store.lock
 
 
@@ -57,7 +59,7 @@ def reset_trajectory_state() -> None:
     default_trajectory_store.clear()
 
 
-def _validate_increment(parameters: Dict[str, Any], param_name: str) -> Optional[int]:
+def _validate_increment(parameters: dict[str, Any], param_name: str) -> int | None:
     """
     Strict increment validation:
     - Must be present in parameters
@@ -72,7 +74,7 @@ def _validate_increment(parameters: Dict[str, Any], param_name: str) -> Optional
     return value
 
 
-def build_accumulation_key(inv: Dict[str, Any], context: Dict[str, Any]) -> str:
+def build_accumulation_key(inv: dict[str, Any], context: dict[str, Any]) -> str:
     """
     Constructs an accumulation key from the invariant's declared dimensions.
     Enforces CROA Framework v1.0.1 §4.6.3 requirements:
@@ -82,7 +84,7 @@ def build_accumulation_key(inv: Dict[str, Any], context: Dict[str, Any]) -> str:
     """
     profile = inv.get("trajectory_profile", inv.get("profile", "TP-C"))
     scope_dims = inv.get("accumulation_key_dimensions", inv.get("scope_dimensions"))
-    
+
     if scope_dims is None:
         scope_str = inv.get("scope")
         if scope_str == "session_subject":
@@ -124,7 +126,7 @@ def build_accumulation_key(inv: Dict[str, Any], context: Dict[str, Any]) -> str:
     return ":".join(parts)
 
 
-def get_trajectory_state(session_subject_or_key: str, inv_id: Optional[str] = None) -> int:
+def get_trajectory_state(session_subject_or_key: str, inv_id: str | None = None) -> int:
     """
     Returns current accumulated value for given accumulation key or (session_subject_key, inv_id).
     """
@@ -146,13 +148,8 @@ def get_trajectory_state(session_subject_or_key: str, inv_id: Optional[str] = No
 
 
 def evaluate_trajectory(
-    session_id: str,
-    subject: str,
-    action: str,
-    parameters: Dict[str, Any],
-    target: str = "",
-    auto_commit: bool = True
-) -> Tuple[str, Optional[Dict[str, Any]]]:
+    session_id: str, subject: str, action: str, parameters: dict[str, Any], target: str = "", auto_commit: bool = True
+) -> tuple[str, dict[str, Any] | None]:
     """
     Canonical atomic trajectory evaluation and commitment mechanism.
     Evaluates cumulative trajectory limits and atomically commits valid increments
@@ -165,33 +162,24 @@ def evaluate_trajectory(
         if active_invariants is None:
             active_invariants = getattr(c1_policy, "INVARIANTS", [])
         applicable_invariants = [inv for inv in active_invariants if inv.get("action") == action]
-        
+
         if not applicable_invariants:
             return "PERMIT", None
-            
-        context = {
-            "session_id": session_id,
-            "subject": subject,
-            "action": action,
-            "target": target
-        }
-        
-        evaluations: List[Dict[str, Any]] = []
-        to_commit: List[Tuple[str, int]] = []
+
+        context = {"session_id": session_id, "subject": subject, "action": action, "target": target}
+
+        evaluations: list[dict[str, Any]] = []
+        to_commit: list[tuple[str, int]] = []
 
         for inv in applicable_invariants:
             inv_id = inv["invariant_id"]
             limit = inv["limit"]
             param_name = inv.get("accumulation_parameter")
-            
+
             count_val = _validate_increment(parameters, param_name)
             if count_val is None:
-                return "DENY", {
-                    "reason": "INVALID_ACCUMULATION_PARAMETER",
-                    "invariant_id": inv_id,
-                    "trajectory_decision": "DENY"
-                }
-                
+                return "DENY", {"reason": "INVALID_ACCUMULATION_PARAMETER", "invariant_id": inv_id, "trajectory_decision": "DENY"}
+
             try:
                 acc_key = build_accumulation_key(inv, context)
             except Exception as e:
@@ -199,13 +187,13 @@ def evaluate_trajectory(
                     "reason": "INVALID_ACCUMULATION_DIMENSION",
                     "error": str(e),
                     "invariant_id": inv_id,
-                    "trajectory_decision": "DENY"
+                    "trajectory_decision": "DENY",
                 }
-                
+
             current = trajectory_state.get(acc_key, 0)
             projected = current + count_val
             profile = inv.get("profile", inv.get("trajectory_profile", "TP-C"))
-            
+
             evaluation = {
                 "invariant_id": inv_id,
                 "profile": profile,
@@ -214,14 +202,14 @@ def evaluate_trajectory(
                 "requested_increment": count_val,
                 "projected_value": projected,
                 "limit": limit,
-                "trajectory_decision": "DENY" if projected > limit else "ALLOW"
+                "trajectory_decision": "DENY" if projected > limit else "ALLOW",
             }
             evaluations.append(evaluation)
             to_commit.append((acc_key, count_val))
 
         denied = [e for e in evaluations if e["trajectory_decision"] == "DENY"]
         primary = denied[0] if denied else evaluations[0]
-        result: Dict[str, Any] = dict(primary)
+        result: dict[str, Any] = dict(primary)
         result["applicable_keys"] = [e["accumulation_key"] for e in evaluations]
         result["invariants"] = evaluations
 
@@ -238,26 +226,20 @@ def evaluate_trajectory(
         return "PERMIT", result
 
 
-def reserve_trajectory(
-    session_id: str,
-    subject: str,
-    action: str,
-    parameters: Dict[str, Any]
-) -> Tuple[str, Optional[Dict[str, Any]]]:
+def reserve_trajectory(session_id: str, subject: str, action: str, parameters: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
     """
     Compatibility API delegating directly to canonical evaluate_trajectory with auto_commit=True.
     """
-    return evaluate_trajectory(
-        session_id=session_id,
-        subject=subject,
-        action=action,
-        parameters=parameters,
-        target="",
-        auto_commit=True
-    )
+    return evaluate_trajectory(session_id=session_id, subject=subject, action=action, parameters=parameters, target="", auto_commit=True)
 
 
-def commit_trajectory(acc_key_or_session: str, increment_or_subject: Any = None, inv_id: Optional[str] = None, increment: Optional[int] = None, **kwargs):
+def commit_trajectory(
+    acc_key_or_session: str,
+    increment_or_subject: Any = None,
+    inv_id: str | None = None,
+    increment: int | None = None,
+    **kwargs,
+):
     """
     Commits trajectory increment atomically under _trajectory_lock.
     Supports both accumulation_key and legacy parameter signatures.

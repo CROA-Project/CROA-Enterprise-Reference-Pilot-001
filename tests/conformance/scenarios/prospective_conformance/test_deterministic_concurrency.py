@@ -1,8 +1,8 @@
+import copy
 import os
 import sys
 import threading
-import copy
-import pytest
+
 from fastapi.testclient import TestClient
 
 # Ensure croa_plane path
@@ -14,12 +14,13 @@ if croa_plane_path not in sys.path:
 os.environ["DEMO_CONTROL_SECRET"] = "test-secret-unit-test"
 os.environ["INTERNAL_SERVICE_SECRET"] = "test-internal-secret"
 
-import c1_policy
-import c4_trajectory
-import c5_evidence
-import c7_compiler
-from main import app
-from auth import get_authenticator, TokenRegistryAuthenticator
+import c1_policy  # noqa: E402
+import c4_trajectory  # noqa: E402
+import c5_evidence  # noqa: E402
+import c7_compiler  # noqa: E402
+from auth import TokenRegistryAuthenticator, get_authenticator  # noqa: E402
+from main import app  # noqa: E402
+
 
 def test_deterministic_concurrency_serialization():
     # Setup paths
@@ -48,7 +49,7 @@ def test_deterministic_concurrency_serialization():
         "limit": 100,
         "window": "cross_session",
         "trajectory_profile": "TP-X",
-        "accumulation_key_dimensions": ["subject"]
+        "accumulation_key_dimensions": ["subject"],
     }
 
     orig_invariants = copy.deepcopy(c1_policy.INVARIANTS)
@@ -71,11 +72,9 @@ def test_deterministic_concurrency_serialization():
             "subject": "finance_ai",
             "action": "export_customers",
             "target": "endpoint:analytics.internal",
-            "parameters": {"count": 15}
+            "parameters": {"count": 15},
         }
-        headers = {
-            "Authorization": "Bearer valid_token_finance_ai"
-        }
+        headers = {"Authorization": "Bearer valid_token_finance_ai"}
         # Synchronize release
         barrier.wait()
         resp = client.post("/propose", json=payload, headers=headers)

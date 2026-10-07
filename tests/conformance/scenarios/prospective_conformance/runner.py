@@ -4,11 +4,11 @@ Evaluates the CURRENT un-remediated MRH SUT against normative CROA v1.0.1 requir
 Strict separation: SUT source code remains unmodified.
 """
 
-import sys
-import os
-import json
 import copy
-from typing import Dict, Any, List
+import json
+import os
+import sys
+from typing import Any
 
 # Ensure croa_plane is importable
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
@@ -19,18 +19,19 @@ if croa_plane_path not in sys.path:
 os.environ["DEMO_CONTROL_SECRET"] = "test-secret-unit-test"
 os.environ["INTERNAL_SERVICE_SECRET"] = "test-internal-secret"
 
-import c1_policy
-import c4_trajectory
-import c2_governor
-import c5_evidence
-import c7_compiler
-from main import app
-from fastapi.testclient import TestClient
-from .definitions import get_prospective_tests, ProspectiveTestCase
-from .fixtures import TEST_SUBJECT_TOKENS
-from auth import get_authenticator, TokenRegistryAuthenticator
+import c1_policy  # noqa: E402
+import c4_trajectory  # noqa: E402
+import c5_evidence  # noqa: E402
+import c7_compiler  # noqa: E402
+from auth import TokenRegistryAuthenticator, get_authenticator  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from main import app  # noqa: E402
 
-def run_prospective_tests(evidence_output_path: str = None) -> Dict[str, Any]:
+from .definitions import get_prospective_tests  # noqa: E402
+from .fixtures import TEST_SUBJECT_TOKENS  # noqa: E402
+
+
+def run_prospective_tests(evidence_output_path: str | None = None) -> dict[str, Any]:
     # Route evidence and keys to host test paths to ensure zero modification to SUT source files
     orig_evidence_file = c5_evidence.EVIDENCE_FILE
     orig_key = c7_compiler.PRIVATE_KEY_PATH
@@ -75,7 +76,7 @@ def run_prospective_tests(evidence_output_path: str = None) -> Dict[str, Any]:
                     "subject": step.subject_body,
                     "action": step.action,
                     "target": step.target,
-                    "parameters": step.parameters
+                    "parameters": step.parameters,
                 }
 
                 # Attach test identity header where specified
@@ -111,20 +112,22 @@ def run_prospective_tests(evidence_output_path: str = None) -> Dict[str, Any]:
                         mrh_non_conformance = True
                         test_passed_normative = False
 
-                step_records.append({
-                    "step_id": step.step_id,
-                    "session_id": step.session_id,
-                    "subject_body": step.subject_body,
-                    "auth_token": step.auth_token,
-                    "parameters": step.parameters,
-                    "expected_decision": step.expected_decision,
-                    "expected_stage": step.expected_stage,
-                    "observed_status_code": status_code,
-                    "observed_decision": observed_decision,
-                    "observed_stage": observed_stage,
-                    "step_conformant": is_step_conformant,
-                    "response_payload": resp_json
-                })
+                step_records.append(
+                    {
+                        "step_id": step.step_id,
+                        "session_id": step.session_id,
+                        "subject_body": step.subject_body,
+                        "auth_token": step.auth_token,
+                        "parameters": step.parameters,
+                        "expected_decision": step.expected_decision,
+                        "expected_stage": step.expected_stage,
+                        "observed_status_code": status_code,
+                        "observed_decision": observed_decision,
+                        "observed_stage": observed_stage,
+                        "step_conformant": is_step_conformant,
+                        "response_payload": resp_json,
+                    }
+                )
 
             if test_passed_normative:
                 classification = "PASS_CURRENT_BEHAVIOR_CONFORMANT"
@@ -139,18 +142,20 @@ def run_prospective_tests(evidence_output_path: str = None) -> Dict[str, Any]:
                 "trajectory_profile": tc.trajectory_profile,
                 "conformance_result": classification,
                 "normative_rationale": tc.normative_rationale,
-                "steps": step_records
+                "steps": step_records,
             }
 
     finally:
-        # Restore c1_policy.INVARIANTS
+        # Restore c1_policy.INVARIANTS and original paths
         c1_policy.INVARIANTS = original_invariants
+        c5_evidence.EVIDENCE_FILE = orig_evidence_file
+        c7_compiler.PRIVATE_KEY_PATH = orig_key
 
     report = {
         "title": "Prospective Conformance Red Baseline Report",
         "authoritative_baseline": "CROA Framework v1.0.1",
         "sut_state": "CURRENT_UN_REMEDIATED_MRH",
-        "results": test_results
+        "results": test_results,
     }
 
     if evidence_output_path:
@@ -158,6 +163,7 @@ def run_prospective_tests(evidence_output_path: str = None) -> Dict[str, Any]:
             json.dump(report, f, indent=2)
 
     return report
+
 
 if __name__ == "__main__":
     report = run_prospective_tests()

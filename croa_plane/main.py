@@ -18,18 +18,13 @@ import hmac
 import json
 import os
 from contextlib import asynccontextmanager
-from typing import Any, Optional
+from typing import Any
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-
 from auth import SubjectAuthenticator, get_authenticator
-from c1_policy import validate_action_parameters
 from c2_governor import evaluate_request
 from c3_resolver import resolve_target
-from c4_trajectory import reset_trajectory_state, trajectory_state
+from c4_trajectory import reset_trajectory_state
 from c5_evidence import (
     EVIDENCE_FILE,
     EvidenceIntegrityError,
@@ -39,6 +34,9 @@ from c5_evidence import (
     verify_chain,
 )
 from c7_compiler import _load_key, generate_ecc
+from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 PLACEHOLDER_SECRETS = {"", "replace-me", "changeme", "change-me", "secret", "password"}
 MIN_SECRET_LENGTH = 12
@@ -51,7 +49,7 @@ def _load_env_if_present() -> None:
     ]:
         if os.path.exists(candidate):
             try:
-                with open(candidate, "r", encoding="utf-8") as f:
+                with open(candidate, encoding="utf-8") as f:
                     for line in f:
                         line = line.strip().lstrip("\ufeff")
                         if line and not line.startswith("#") and "=" in line:
@@ -126,10 +124,11 @@ def verify_internal_service(x_internal_service_secret: str | None = Header(None)
 # Pluggable SubjectAuthenticator dependency injection with strict fail-closed logic
 # ==============================================================================
 
+
 def authenticate_subject_intake(
-    authorization: Optional[str] = Header(None),
-    x_subject_token: Optional[str] = Header(None),
-    authenticator: SubjectAuthenticator = Depends(get_authenticator),
+    authorization: str | None = Header(None),
+    x_subject_token: str | None = Header(None),
+    authenticator: SubjectAuthenticator = Depends(get_authenticator),  # noqa: B008
 ) -> str:
     """
     Intake authentication hook verifying caller credentials against pluggable authenticator.
@@ -384,12 +383,14 @@ def propose_action(
         invariant_set_version=c2_result["invariant_set_version"],
         ecc_data=ecc_ev_data,
     )
-    c2_result.update({
-        "ecc_id": ecc_data["ecc_id"],
-        "ecc": ecc_data["ecc"],
-        "expires_at": ecc_data["expires_at"],
-        "kid": ecc_data["kid"],
-    })
+    c2_result.update(
+        {
+            "ecc_id": ecc_data["ecc_id"],
+            "ecc": ecc_data["ecc"],
+            "expires_at": ecc_data["expires_at"],
+            "kid": ecc_data["kid"],
+        }
+    )
     if "auth_ref" in ecc_data:
         c2_result["auth_ref"] = ecc_data["auth_ref"]
     if "exception_scope" in ecc_data:

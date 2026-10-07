@@ -20,7 +20,7 @@ import json
 import os
 import threading
 import time
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 import jwt
@@ -41,7 +41,7 @@ def _load_env_if_present() -> None:
     ]:
         if os.path.exists(candidate):
             try:
-                with open(candidate, "r", encoding="utf-8") as f:
+                with open(candidate, encoding="utf-8") as f:
                     for line in f:
                         line = line.strip().lstrip("\ufeff")
                         if line and not line.startswith("#") and "=" in line:
@@ -137,6 +137,7 @@ MANDATORY_CLAIMS = [
     "parameters_hash",
     "invariant_set_version",
 ]
+
 
 # --------------------------------------------------------------------------- Redemption Store
 class InMemoryRedemptionStore:
@@ -236,7 +237,7 @@ class ExecuteRequest(BaseModel):
     action: str
     target: str
     parameters: dict[str, Any]
-    request_id: Optional[str] = None
+    request_id: str | None = None
 
 
 class RefusalRequest(BaseModel):
@@ -339,7 +340,9 @@ def _allow(ecc_id: str, execution: dict[str, Any]) -> dict[str, Any]:
 
 @app.post("/refuse", dependencies=[Depends(verify_internal_service)])
 async def refuse_gateway(req: RefusalRequest):
-    await _record_evidence(req.request_id, req.session_id, None, req.subject, req.action, req.target, "EXECUTION_BLOCKED", "DENY", req.reason)
+    await _record_evidence(
+        req.request_id, req.session_id, None, req.subject, req.action, req.target, "EXECUTION_BLOCKED", "DENY", req.reason
+    )
     resp = req.model_dump()
     resp.update(
         {

@@ -1,6 +1,6 @@
+import httpx
 from fastapi.testclient import TestClient
 from main import app
-import httpx
 
 client = TestClient(app)
 
@@ -29,7 +29,7 @@ def test_1_missing_ecc_block_with_request_id():
     })
     assert resp.status_code == 200
     assert resp.json() == {"decision": "BLOCK", "reason": "MISSING_ECC"}
-    
+
     assert len(captured_evidence) == 1
     ev = captured_evidence[0]
     assert ev["request_id"] == "test-req-123"
@@ -37,7 +37,7 @@ def test_1_missing_ecc_block_with_request_id():
     assert ev["reason"] == "MISSING_ECC"
     assert ev["event_type"] == "EXECUTION_BLOCKED"
     assert ev.get("ecc_id") is None
-    
+
 def test_3_missing_ecc_no_request_id():
     captured_evidence.clear()
     resp = client.post("/execute", json={
@@ -49,7 +49,7 @@ def test_3_missing_ecc_no_request_id():
     })
     assert resp.status_code == 200
     assert resp.json() == {"decision": "BLOCK", "reason": "MISSING_ECC"}
-    
+
     assert len(captured_evidence) == 1
     ev = captured_evidence[0]
     assert ev["request_id"] == "unknown"

@@ -7,24 +7,22 @@ Operates against an explicit registry without embedded domain knowledge.
 Fails closed on unregistered actions or schema contract violations.
 """
 
-from typing import Dict, Any, Set, Tuple, Optional
+from typing import Any
+
 
 class ActionSchemaRegistry:
     def __init__(self):
-        self._schemas: Dict[str, Dict[str, Set[str]]] = {}
+        self._schemas: dict[str, dict[str, set[str]]] = {}
 
-    def register_schema(self, action: str, allowed_keys: Set[str], required_keys: Optional[Set[str]] = None) -> None:
+    def register_schema(self, action: str, allowed_keys: set[str], required_keys: set[str] | None = None) -> None:
         """Registers a canonical parameter contract for an action."""
-        self._schemas[action] = {
-            "allowed_keys": set(allowed_keys),
-            "required_keys": set(required_keys or set())
-        }
+        self._schemas[action] = {"allowed_keys": set(allowed_keys), "required_keys": set(required_keys or set())}
 
     def unregister_schema(self, action: str) -> None:
         """Removes an action schema from the registry."""
         self._schemas.pop(action, None)
 
-    def get_schema(self, action: str) -> Optional[Dict[str, Set[str]]]:
+    def get_schema(self, action: str) -> dict[str, set[str]] | None:
         """Retrieves registered schema for an action."""
         return self._schemas.get(action)
 
@@ -36,11 +34,7 @@ class ActionSchemaRegistry:
         """Clears all registered schemas."""
         self._schemas.clear()
 
-    def validate_action_parameters(
-        self,
-        action: str,
-        parameters: Optional[Dict[str, Any]]
-    ) -> Tuple[bool, str]:
+    def validate_action_parameters(self, action: str, parameters: dict[str, Any] | None) -> tuple[bool, str]:
         """
         Validates incoming request parameters against the registered action schema contract.
         Fails closed with explicit reason code if unregistered or invalid.
@@ -65,6 +59,7 @@ class ActionSchemaRegistry:
 
         return True, "VALID"
 
+
 # Global default schema registry instance
 default_schema_registry = ActionSchemaRegistry()
 
@@ -78,7 +73,10 @@ default_schema_registry.register_schema("get_customer", allowed_keys={"customer_
 default_schema_registry.register_schema("export_customers", allowed_keys={"count", "format", "include_pii"}, required_keys=set())
 default_schema_registry.register_schema("delete_environment", allowed_keys={"environment_id", "force"}, required_keys=set())
 
-def validate_action_parameters(action: str, parameters: Optional[Dict[str, Any]], registry: Optional[ActionSchemaRegistry] = None) -> Tuple[bool, str]:
+
+def validate_action_parameters(
+    action: str, parameters: dict[str, Any] | None, registry: ActionSchemaRegistry | None = None
+) -> tuple[bool, str]:
     """Helper delegating to specified registry or global default."""
     reg = registry or default_schema_registry
     return reg.validate_action_parameters(action, parameters)

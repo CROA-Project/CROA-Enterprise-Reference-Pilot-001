@@ -11,13 +11,14 @@ Logs all governance decisions to tamper-evident evidence log (C5).
 
 from __future__ import annotations
 
-from typing import Dict, Any, Optional
+from typing import Any
+
 from c1_policy import INVARIANT_SET_VERSION, evaluate_policy, validate_action_parameters, verify_authorization_artifact
 from c4_trajectory import evaluate_trajectory
 from c5_evidence import record_event, utc_now_iso
 
 
-def _response(req: Dict[str, Any], decision: str, reason: str, stage: str, policy_id: Optional[str]) -> Dict[str, Any]:
+def _response(req: dict[str, Any], decision: str, reason: str, stage: str, policy_id: str | None) -> dict[str, Any]:
     return {
         "request_id": req.get("request_id"),
         "session_id": req.get("session_id"),
@@ -33,7 +34,7 @@ def _response(req: Dict[str, Any], decision: str, reason: str, stage: str, polic
     }
 
 
-def evaluate_request(request_data: Dict[str, Any]) -> Dict[str, Any]:
+def evaluate_request(request_data: dict[str, Any]) -> dict[str, Any]:
     req_id = request_data.get("request_id")
     subject = request_data.get("subject")
     action = request_data.get("action")
@@ -44,9 +45,7 @@ def evaluate_request(request_data: Dict[str, Any]) -> Dict[str, Any]:
     # Check for Governed Authorization Artifact (CROA §4.3 / §4.9)
     auth_artifact = request_data.get("authorization_artifact")
     if auth_artifact:
-        is_valid_auth, auth_reason, exception_scope = verify_authorization_artifact(
-            auth_artifact, subject, action, target, parameters
-        )
+        is_valid_auth, auth_reason, exception_scope = verify_authorization_artifact(auth_artifact, subject, action, target, parameters)
         if not is_valid_auth:
             record_event(req_id, session_id, subject, action, target, "DENY", "DENY", auth_reason, "C2", None, INVARIANT_SET_VERSION)
             return _response(request_data, "DENY", auth_reason, "C2", None)
@@ -56,7 +55,19 @@ def evaluate_request(request_data: Dict[str, Any]) -> Dict[str, Any]:
         inv_ref = auth_artifact.get("invariant_reference")
         exception_policy_id = f"EXCEPTION:{inv_ref}"
 
-        record_event(req_id, session_id, subject, action, target, "PERMIT_WITH_AUTHORIZATION", "PERMIT", "POLICY_ALLOWED_UNDER_AUTHORIZATION", "C2", exception_policy_id, INVARIANT_SET_VERSION)
+        record_event(
+            req_id,
+            session_id,
+            subject,
+            action,
+            target,
+            "PERMIT_WITH_AUTHORIZATION",
+            "PERMIT",
+            "POLICY_ALLOWED_UNDER_AUTHORIZATION",
+            "C2",
+            exception_policy_id,
+            INVARIANT_SET_VERSION,
+        )
         resp = _response(request_data, "PERMIT_WITH_AUTHORIZATION", "POLICY_ALLOWED_UNDER_AUTHORIZATION", "C2", exception_policy_id)
         resp["auth_id"] = auth_artifact["auth_id"]
         resp["exception_scope"] = exception_scope
@@ -76,7 +87,19 @@ def evaluate_request(request_data: Dict[str, Any]) -> Dict[str, Any]:
     # Parameter admission contract check (CROA §4.5.1 / §4.9.1)
     is_valid_param, param_reason = validate_action_parameters(action, parameters)
     if not is_valid_param:
-        record_event(req_id, session_id, subject, action, target, "DENY", "DENY", param_reason, "AGENT_SURFACE_ADMISSION", policy_id, INVARIANT_SET_VERSION)
+        record_event(
+            req_id,
+            session_id,
+            subject,
+            action,
+            target,
+            "DENY",
+            "DENY",
+            param_reason,
+            "AGENT_SURFACE_ADMISSION",
+            policy_id,
+            INVARIANT_SET_VERSION,
+        )
         return _response(request_data, "DENY", param_reason, "AGENT_SURFACE_ADMISSION", policy_id)
 
     # C4: evaluate-and-reserve is a single atomic step (see c4_trajectory.evaluate_trajectory).

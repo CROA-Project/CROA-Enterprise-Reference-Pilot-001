@@ -7,33 +7,14 @@ Operates with strict fail-closed semantics across all operator checks.
 Zero business-domain names embedded in control flow.
 """
 
-from typing import Dict, Any, Tuple, Optional, Set
+from typing import Any
 
-SUPPORTED_OPERATORS: Set[str] = {
-    "equals",
-    "not_equals",
-    "max",
-    "min",
-    "in",
-    "not_in",
-    "type",
-    "required"
-}
+SUPPORTED_OPERATORS: set[str] = {"equals", "not_equals", "max", "min", "in", "not_in", "type", "required"}
 
-SUPPORTED_TYPE_NAMES: Set[str] = {
-    "int",
-    "float",
-    "number",
-    "str",
-    "bool",
-    "list",
-    "dict"
-}
+SUPPORTED_TYPE_NAMES: set[str] = {"int", "float", "number", "str", "bool", "list", "dict"}
 
-def evaluate_parameter_constraints(
-    constraints: Optional[Dict[str, Any]],
-    parameters: Optional[Dict[str, Any]]
-) -> Tuple[bool, str]:
+
+def evaluate_parameter_constraints(constraints: dict[str, Any] | None, parameters: dict[str, Any] | None) -> tuple[bool, str]:
     """
     Evaluates declarative parameter constraints against incoming parameters.
     Returns (True, "VALID") or (False, "<REASON_CODE>: detail").
@@ -77,14 +58,14 @@ def evaluate_parameter_constraints(
             expected_type = rule_spec["type"]
             if expected_type not in SUPPORTED_TYPE_NAMES:
                 return False, f"UNSUPPORTED_TYPE_SPECIFICATION: Type '{expected_type}' is not recognized"
-            
+
             type_valid = False
             if expected_type == "int":
                 type_valid = isinstance(val, int) and not isinstance(val, bool)
             elif expected_type == "float":
                 type_valid = isinstance(val, float)
             elif expected_type == "number":
-                type_valid = (isinstance(val, (int, float)) and not isinstance(val, bool))
+                type_valid = isinstance(val, (int, float)) and not isinstance(val, bool)
             elif expected_type == "str":
                 type_valid = isinstance(val, str)
             elif expected_type == "bool":

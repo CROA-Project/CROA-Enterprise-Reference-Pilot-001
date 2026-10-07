@@ -7,7 +7,12 @@ asyncio_default_fixture_loop_scope = "session"
 [tool.ruff]
 line-length = 140
 target-version = "py312"
-extend-exclude = ["tests/test_phase*.py", "tests/test_hardening.py", "tests/test_ttl_enforcement.py"]
+extend-exclude = [
+    "tests/test_phase*.py",
+    "tests/test_hardening.py",
+    "tests/test_ttl_enforcement.py",
+    "tests/summit_q1/**",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]

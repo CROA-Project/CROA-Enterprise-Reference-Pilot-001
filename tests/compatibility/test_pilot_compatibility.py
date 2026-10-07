@@ -8,9 +8,10 @@ without requiring domain hardcoding inside the core engine.
 Also verifies hermetic fixture isolation post-teardown.
 """
 
-import sys
-import os
 import datetime
+import os
+import sys
+
 import pytest
 from fastapi import HTTPException
 
@@ -20,13 +21,14 @@ croa_plane_path = os.path.join(repo_root, "croa_plane")
 if croa_plane_path not in sys.path:
     sys.path.insert(0, croa_plane_path)
 
-from fixtures.pilot_fixtures import pilot_fixtures, PILOT_TEST_ISSUER_KEY, PILOT_TEST_SIGNATURE_PROOF
-from c2_governor import evaluate_request
-from c1_policy import validate_action_parameters
-from c3_resolver import resolve_target, default_context_registry
-from auth import get_authenticator
-from verifier import get_verifier
-import c4_trajectory
+import c4_trajectory  # noqa: E402
+from auth import get_authenticator  # noqa: E402
+from c1_policy import validate_action_parameters  # noqa: E402
+from c2_governor import evaluate_request  # noqa: E402
+from c3_resolver import default_context_registry, resolve_target  # noqa: E402
+from fixtures.pilot_fixtures import PILOT_TEST_ISSUER_KEY, PILOT_TEST_SIGNATURE_PROOF, pilot_fixtures  # noqa: E402
+from verifier import get_verifier  # noqa: E402
+
 
 def test_pilot_workload_lifecycle_and_exception_path():
     with pilot_fixtures():
@@ -48,14 +50,14 @@ def test_pilot_workload_lifecycle_and_exception_path():
             "subject": "finance_ai",
             "action": "update_customer_pricing",
             "target": "pricing_system",
-            "parameters": {"product": "sku-1", "discount_pct": 10}
+            "parameters": {"product": "sku-1", "discount_pct": 10},
         }
         res_unauth = evaluate_request(unauth_req)
         assert res_unauth["decision"] == "DENY"
         assert res_unauth["reason"] == "POLICY_DENIED"
 
         # 4. Governed exception path with valid C1 authorization artifact
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         eff_from = (now - datetime.timedelta(minutes=5)).isoformat()
         exp_at = (now + datetime.timedelta(minutes=15)).isoformat()
 
@@ -64,19 +66,12 @@ def test_pilot_workload_lifecycle_and_exception_path():
             "subject_scope": "finance_ai",
             "action_scope": "update_customer_pricing",
             "invariant_reference": "INVARIANT-PRICING-001",
-            "validity_window": {
-                "effective_from": eff_from,
-                "expires_at": exp_at
-            },
+            "validity_window": {"effective_from": eff_from, "expires_at": exp_at},
             "redemption_policy": "single-use",
             "issuer_key_id": PILOT_TEST_ISSUER_KEY,
             "signature": PILOT_TEST_SIGNATURE_PROOF,
-            "target_constraints": {
-                "target": "pricing_system"
-            },
-            "parameter_constraints": {
-                "discount_pct": {"type": "int", "max": 15, "min": 0}
-            }
+            "target_constraints": {"target": "pricing_system"},
+            "parameter_constraints": {"discount_pct": {"type": "int", "max": 15, "min": 0}},
         }
 
         # Submitting with discount_pct = 10 (Within authorized bounds)
@@ -117,10 +112,7 @@ def test_pilot_workload_lifecycle_and_exception_path():
 
     # D. Pilot authorization verifier material is absent
     ver = get_verifier()
-    valid_sig, sig_reason = ver.verify_signature({
-        "issuer_key_id": PILOT_TEST_ISSUER_KEY,
-        "signature": PILOT_TEST_SIGNATURE_PROOF
-    })
+    valid_sig, sig_reason = ver.verify_signature({"issuer_key_id": PILOT_TEST_ISSUER_KEY, "signature": PILOT_TEST_SIGNATURE_PROOF})
     assert valid_sig is False
     assert "Untrusted or unregistered issuer key" in sig_reason
 
@@ -131,13 +123,15 @@ def test_pilot_workload_lifecycle_and_exception_path():
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
     import c6_firewall.main as c6_main
+
     assert len(c6_main.default_redemption_store.redeemed_nonces) == 0
     assert len(c6_main.default_redemption_store.redeemed_auth_ids) == 0
+
 
 def test_missing_invariant_reference_fails_closed():
     """Verifies that missing invariant_reference fails closed at C1 and cannot grant exception."""
     with pilot_fixtures():
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         eff_from = (now - datetime.timedelta(minutes=5)).isoformat()
         exp_at = (now + datetime.timedelta(minutes=15)).isoformat()
 
@@ -147,14 +141,11 @@ def test_missing_invariant_reference_fails_closed():
             "subject_scope": "finance_ai",
             "action_scope": "update_customer_pricing",
             # invariant_reference omitted
-            "validity_window": {
-                "effective_from": eff_from,
-                "expires_at": exp_at
-            },
+            "validity_window": {"effective_from": eff_from, "expires_at": exp_at},
             "redemption_policy": "single-use",
             "issuer_key_id": PILOT_TEST_ISSUER_KEY,
             "signature": PILOT_TEST_SIGNATURE_PROOF,
-            "target_constraints": {"target": "pricing_system"}
+            "target_constraints": {"target": "pricing_system"},
         }
 
         req = {
@@ -164,7 +155,7 @@ def test_missing_invariant_reference_fails_closed():
             "action": "update_customer_pricing",
             "target": "pricing_system",
             "parameters": {"product": "sku-1", "discount_pct": 5},
-            "authorization_artifact": artifact_missing_inv
+            "authorization_artifact": artifact_missing_inv,
         }
 
         res = evaluate_request(req)

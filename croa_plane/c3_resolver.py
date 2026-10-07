@@ -7,12 +7,11 @@ Fails closed with TARGET_NOT_REGISTERED or TARGET_TYPE_MISMATCH.
 Zero domain-specific pricing or external pilot fixtures in generic baseline.
 """
 
-from typing import Dict, Tuple, Optional
 
 class ContextRegistry:
     def __init__(self):
-        self._registry: Dict[str, str] = {}
-        self._action_target_types: Dict[str, str] = {}
+        self._registry: dict[str, str] = {}
+        self._action_target_types: dict[str, str] = {}
         self._init_defaults()
 
     def _init_defaults(self):
@@ -23,7 +22,7 @@ class ContextRegistry:
             "environment:dev": "environment",
             "environment:prod": "environment",
             "endpoint:analytics.internal": "endpoint",
-            "resource:default": "resource"
+            "resource:default": "resource",
         }
         self._action_target_types = {
             "get_customer": "customer",
@@ -33,15 +32,15 @@ class ContextRegistry:
             "delete_environment": "environment",
             "get_resource": "resource",
             "export_records": "endpoint",
-            "delete_resource": "resource"
+            "delete_resource": "resource",
         }
 
     @property
-    def registry(self) -> Dict[str, str]:
+    def registry(self) -> dict[str, str]:
         return self._registry
 
     @property
-    def action_target_types(self) -> Dict[str, str]:
+    def action_target_types(self) -> dict[str, str]:
         return self._action_target_types
 
     def register_target(self, target: str, target_type: str) -> None:
@@ -65,7 +64,7 @@ class ContextRegistry:
         """Resets the registry to baseline generic entries."""
         self._init_defaults()
 
-    def resolve_target(self, action: str, target: str) -> Tuple[bool, str]:
+    def resolve_target(self, action: str, target: str) -> tuple[bool, str]:
         """
         Grounds target identifier against registered context.
         Fails closed if target is unknown or does not match action's expected type.
@@ -81,6 +80,7 @@ class ContextRegistry:
 
         return True, "GROUNDED"
 
+
 # Global default context registry instance
 default_context_registry = ContextRegistry()
 
@@ -88,11 +88,14 @@ default_context_registry = ContextRegistry()
 FEDERATED_CONTEXT_REGISTRY = default_context_registry.registry
 ACTION_TARGET_TYPES = default_context_registry.action_target_types
 
+
 def register_target(target: str, target_type: str) -> None:
     default_context_registry.register_target(target, target_type)
+
 
 def register_action_target_type(action: str, target_type: str) -> None:
     default_context_registry.register_action_target_type(action, target_type)
 
-def resolve_target(action: str, target: str) -> Tuple[bool, str]:
+
+def resolve_target(action: str, target: str) -> tuple[bool, str]:
     return default_context_registry.resolve_target(action, target)

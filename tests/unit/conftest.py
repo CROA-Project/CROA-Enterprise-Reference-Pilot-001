@@ -4,7 +4,6 @@ control-plane and AcmeOps ASGI apps (with fault injection). No Docker required."
 
 from __future__ import annotations
 
-import functools
 import importlib.util
 import os
 import sys
@@ -22,6 +21,7 @@ INTERNAL_SECRET = "unit-test-internal-service-secret"
 
 def pytest_collection_modifyitems(items):
     import inspect
+
     for item in items:
         if inspect.iscoroutinefunction(item.obj):
             item.add_marker(pytest.mark.anyio)
@@ -159,6 +159,7 @@ def clean_state(services):
     s["acme"].EXECUTIONS.clear()
     s["croa"]._test_c5_unavailable = False
     import c3_resolver
+
     c3_resolver.register_target("customer:342", "customer")
     yield
     c3_resolver.default_context_registry.unregister_target("customer:342")
@@ -190,6 +191,7 @@ def propose(client, **overrides):
     body.update(overrides)
     if "Authorization" not in headers and "X-Subject-Token" not in headers and not overrides.pop("skip_auth", False):
         from auth import get_authenticator
+
         subj = body.get("subject", "agent:1")
         token = f"unit-test-{subj}-token"
         get_authenticator().register_token(token, subj)

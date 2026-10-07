@@ -8,11 +8,12 @@ and positive controls on independent nonces.
 Scope: In-memory single-process Reference Harness (InMemoryRedemptionStore).
 """
 
-import sys
 import os
+import sys
 import threading
-import pytest
+
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -26,9 +27,11 @@ if croa_plane_path not in sys.path:
 os.environ["DEMO_CONTROL_SECRET"] = "test-secret-unit-test"
 os.environ["INTERNAL_SERVICE_SECRET"] = "test-internal-secret"
 
-import c7_compiler
-import c6_firewall.main as c6_mod
-from c6_firewall.main import app as c6_app, default_redemption_store, InMemoryRedemptionStore
+import c7_compiler  # noqa: E402
+
+import c6_firewall.main as c6_mod  # noqa: E402
+from c6_firewall.main import app as c6_app  # noqa: E402
+from c6_firewall.main import default_redemption_store  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -82,7 +85,7 @@ def test_c6_auth_id_sequential_replay(setup_c6_environment):
         invariant_set_version="pilot-policy-set-v1",
         decision_basis="PERMIT_WITH_AUTHORIZATION",
         auth_id=auth_id,
-        exception_scope={"action_class": "export_customers", "target_constraints": {"target": "endpoint:analytics.internal"}}
+        exception_scope={"action_class": "export_customers", "target_constraints": {"target": "endpoint:analytics.internal"}},
     )
     ecc2 = c7_compiler.generate_ecc(
         request_id="req-seq-2",
@@ -94,7 +97,7 @@ def test_c6_auth_id_sequential_replay(setup_c6_environment):
         invariant_set_version="pilot-policy-set-v1",
         decision_basis="PERMIT_WITH_AUTHORIZATION",
         auth_id=auth_id,
-        exception_scope={"action_class": "export_customers", "target_constraints": {"target": "endpoint:analytics.internal"}}
+        exception_scope={"action_class": "export_customers", "target_constraints": {"target": "endpoint:analytics.internal"}},
     )
 
     body1 = {
@@ -102,14 +105,14 @@ def test_c6_auth_id_sequential_replay(setup_c6_environment):
         "subject": "alice",
         "action": "export_customers",
         "target": "endpoint:analytics.internal",
-        "parameters": {"count": 10}
+        "parameters": {"count": 10},
     }
     body2 = {
         "ecc": ecc2["ecc"],
         "subject": "alice",
         "action": "export_customers",
         "target": "endpoint:analytics.internal",
-        "parameters": {"count": 10}
+        "parameters": {"count": 10},
     }
 
     resp1 = client.post("/execute", json=body1).json()
@@ -143,7 +146,7 @@ def test_c6_auth_id_concurrent_double_redemption(setup_c6_environment):
         invariant_set_version="pilot-policy-set-v1",
         decision_basis="PERMIT_WITH_AUTHORIZATION",
         auth_id=auth_id,
-        exception_scope={"action_class": "export_customers", "target_constraints": {"target": "endpoint:analytics.internal"}}
+        exception_scope={"action_class": "export_customers", "target_constraints": {"target": "endpoint:analytics.internal"}},
     )
     ecc2 = c7_compiler.generate_ecc(
         request_id="req-conc-2",
@@ -155,7 +158,7 @@ def test_c6_auth_id_concurrent_double_redemption(setup_c6_environment):
         invariant_set_version="pilot-policy-set-v1",
         decision_basis="PERMIT_WITH_AUTHORIZATION",
         auth_id=auth_id,
-        exception_scope={"action_class": "export_customers", "target_constraints": {"target": "endpoint:analytics.internal"}}
+        exception_scope={"action_class": "export_customers", "target_constraints": {"target": "endpoint:analytics.internal"}},
     )
 
     barrier = threading.Barrier(2)
@@ -167,7 +170,7 @@ def test_c6_auth_id_concurrent_double_redemption(setup_c6_environment):
             "subject": "alice",
             "action": "export_customers",
             "target": "endpoint:analytics.internal",
-            "parameters": {"count": 10}
+            "parameters": {"count": 10},
         }
         barrier.wait()
         results[worker_id] = client.post("/execute", json=body).json()
@@ -209,7 +212,7 @@ def test_c6_ecc_nonce_replay(setup_c6_environment):
         action="export_customers",
         target="endpoint:analytics.internal",
         parameters={"count": 10},
-        invariant_set_version="pilot-policy-set-v1"
+        invariant_set_version="pilot-policy-set-v1",
     )
 
     body = {
@@ -217,7 +220,7 @@ def test_c6_ecc_nonce_replay(setup_c6_environment):
         "subject": "alice",
         "action": "export_customers",
         "target": "endpoint:analytics.internal",
-        "parameters": {"count": 10}
+        "parameters": {"count": 10},
     }
 
     resp1 = client.post("/execute", json=body).json()
@@ -246,7 +249,7 @@ def test_c6_independent_ecc_positive_control(setup_c6_environment):
         action="export_customers",
         target="endpoint:analytics.internal",
         parameters={"count": 10},
-        invariant_set_version="pilot-policy-set-v1"
+        invariant_set_version="pilot-policy-set-v1",
     )
     ecc2 = c7_compiler.generate_ecc(
         request_id="req-indep-2",
@@ -255,7 +258,7 @@ def test_c6_independent_ecc_positive_control(setup_c6_environment):
         action="export_customers",
         target="endpoint:analytics.internal",
         parameters={"count": 10},
-        invariant_set_version="pilot-policy-set-v1"
+        invariant_set_version="pilot-policy-set-v1",
     )
 
     body1 = {
@@ -263,14 +266,14 @@ def test_c6_independent_ecc_positive_control(setup_c6_environment):
         "subject": "alice",
         "action": "export_customers",
         "target": "endpoint:analytics.internal",
-        "parameters": {"count": 10}
+        "parameters": {"count": 10},
     }
     body2 = {
         "ecc": ecc2["ecc"],
         "subject": "alice",
         "action": "export_customers",
         "target": "endpoint:analytics.internal",
-        "parameters": {"count": 10}
+        "parameters": {"count": 10},
     }
 
     resp1 = client.post("/execute", json=body1).json()

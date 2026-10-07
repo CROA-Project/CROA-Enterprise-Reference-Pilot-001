@@ -8,11 +8,10 @@ Encapsulates all domain-specific Summit / Enterprise Pilot identities,
 schemas, context targets, test policies, invariants, and authorization keys.
 """
 
-import sys
 import os
-import tempfile
 import shutil
-from typing import Dict, Any, Generator, Optional
+import sys
+import tempfile
 from contextlib import contextmanager
 
 # Ensure croa_plane is importable
@@ -21,23 +20,17 @@ croa_plane_path = os.path.join(repo_root, "croa_plane")
 if croa_plane_path not in sys.path:
     sys.path.insert(0, croa_plane_path)
 
-import c1_policy
-import c3_resolver
-import c5_evidence
-from schema_registry import default_schema_registry
-from auth import get_authenticator, TokenRegistryAuthenticator
-from verifier import get_verifier, MockAuthorizationVerifier
+import c1_policy  # noqa: E402
+import c3_resolver  # noqa: E402
+import c5_evidence  # noqa: E402
+from auth import TokenRegistryAuthenticator, get_authenticator  # noqa: E402
+from schema_registry import default_schema_registry  # noqa: E402
+from verifier import MockAuthorizationVerifier, get_verifier  # noqa: E402
 
 # Domain-specific pilot actions and parameter schemas
 PILOT_SCHEMAS = {
-    "update_customer_pricing": {
-        "allowed_keys": {"product", "discount_pct"},
-        "required_keys": set()
-    },
-    "submit_financial_analysis": {
-        "allowed_keys": {"analytical_model"},
-        "required_keys": set()
-    }
+    "update_customer_pricing": {"allowed_keys": {"product", "discount_pct"}, "required_keys": set()},
+    "submit_financial_analysis": {"allowed_keys": {"analytical_model"}, "required_keys": set()},
 }
 
 # Domain-specific pilot context registry entries
@@ -45,13 +38,13 @@ PILOT_TARGETS = {
     "customer:342": "customer",
     "pricing_system": "pricing",
     "customer_database": "database",
-    "financial_analysis_store": "store"
+    "financial_analysis_store": "store",
 }
 
 PILOT_ACTION_TARGET_TYPES = {
     "update_customer_pricing": "pricing",
     "revenue_optimization_discount": "pricing",
-    "submit_financial_analysis": "store"
+    "submit_financial_analysis": "store",
 }
 
 # Domain-specific pilot policies
@@ -61,7 +54,7 @@ PILOT_POLICIES = [
         "description": "update_customer_pricing is denied without exception authorization",
         "action": "update_customer_pricing",
         "target": "pricing_system",
-        "effect": "DENY"
+        "effect": "DENY",
     }
 ]
 
@@ -75,7 +68,7 @@ PILOT_INVARIANTS = [
         "action": "update_customer_pricing",
         "target": "pricing_system",
         "effect": "DENY",
-        "version": "1"
+        "version": "1",
     }
 ]
 
@@ -86,14 +79,15 @@ PILOT_TEST_TOKENS = {
     "valid_token_finance_ai_alt": "finance_ai_alt",
     "valid_token_billing_worker": "billing_worker",
     "valid_token_calib_agent": "calib_agent",
-    "valid_token_test_agent": "test_agent"
+    "valid_token_test_agent": "test_agent",
 }
 
 PILOT_TEST_ISSUER_KEY = "key-c1-policy-auth-2026"
 PILOT_TEST_SIGNATURE_PROOF = "c1_attested_cryptographic_signature_proof"
 
-_orig_evidence_file: Optional[str] = None
-_temp_dir: Optional[str] = None
+_orig_evidence_file: str | None = None
+_temp_dir: str | None = None
+
 
 def setup_pilot_fixtures():
     """Registers pilot domain schemas, targets, policies, tokens, and verification keys."""
@@ -107,11 +101,7 @@ def setup_pilot_fixtures():
 
     # Register schemas
     for action, schema in PILOT_SCHEMAS.items():
-        default_schema_registry.register_schema(
-            action,
-            allowed_keys=schema["allowed_keys"],
-            required_keys=schema["required_keys"]
-        )
+        default_schema_registry.register_schema(action, allowed_keys=schema["allowed_keys"], required_keys=schema["required_keys"])
 
     # Register targets
     for target, target_type in PILOT_TARGETS.items():
@@ -139,6 +129,7 @@ def setup_pilot_fixtures():
         ver.register_trusted_key(PILOT_TEST_ISSUER_KEY)
         ver.set_expected_signature_proof(PILOT_TEST_SIGNATURE_PROOF)
 
+
 def teardown_pilot_fixtures():
     """Cleans up registered pilot fixtures and resets core registries to defaults."""
     global _orig_evidence_file, _temp_dir
@@ -160,6 +151,7 @@ def teardown_pilot_fixtures():
 
     # Explicitly clear trajectory store
     import c4_trajectory
+
     c4_trajectory.default_trajectory_store.clear()
     c4_trajectory.trajectory_state.clear()
 
@@ -172,6 +164,7 @@ def teardown_pilot_fixtures():
         if "INTERNAL_SERVICE_SECRET" not in os.environ:
             os.environ["INTERNAL_SERVICE_SECRET"] = "test-internal-secret"
         import c6_firewall.main as c6_main
+
         c6_main.default_redemption_store.clear()
     except Exception:
         pass
@@ -184,6 +177,7 @@ def teardown_pilot_fixtures():
     if _temp_dir and os.path.exists(_temp_dir):
         shutil.rmtree(_temp_dir, ignore_errors=True)
         _temp_dir = None
+
 
 @contextmanager
 def pilot_fixtures():

@@ -8,18 +8,20 @@ Zero hardcoded test keys embedded in generic core logic.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Tuple, Optional, Set
+from typing import Any
+
 
 class AuthorizationVerifier(ABC):
     """Abstract interface for validating cryptographic authorization artifact signatures."""
 
     @abstractmethod
-    def verify_signature(self, artifact: Dict[str, Any]) -> Tuple[bool, str]:
+    def verify_signature(self, artifact: dict[str, Any]) -> tuple[bool, str]:
         """
         Validates issuer key and cryptographic signature of the authorization artifact.
         Returns (True, "VALID") or (False, "<REASON_CODE>").
         """
         pass
+
 
 class MockAuthorizationVerifier(AuthorizationVerifier):
     """
@@ -28,13 +30,9 @@ class MockAuthorizationVerifier(AuthorizationVerifier):
     NOT production PKI or asymmetric cryptographic signature verification.
     """
 
-    def __init__(
-        self,
-        trusted_issuer_keys: Optional[Set[str]] = None,
-        expected_signature_proof: Optional[str] = None
-    ):
-        self._trusted_issuer_keys: Set[str] = set(trusted_issuer_keys or set())
-        self._expected_signature_proof: Optional[str] = expected_signature_proof
+    def __init__(self, trusted_issuer_keys: set[str] | None = None, expected_signature_proof: str | None = None):
+        self._trusted_issuer_keys: set[str] = set(trusted_issuer_keys or set())
+        self._expected_signature_proof: str | None = expected_signature_proof
 
     def register_trusted_key(self, key_id: str) -> None:
         """Registers a trusted issuer key ID."""
@@ -49,7 +47,7 @@ class MockAuthorizationVerifier(AuthorizationVerifier):
         self._trusted_issuer_keys.clear()
         self._expected_signature_proof = None
 
-    def verify_signature(self, artifact: Dict[str, Any]) -> Tuple[bool, str]:
+    def verify_signature(self, artifact: dict[str, Any]) -> tuple[bool, str]:
         issuer_key = artifact.get("issuer_key_id")
         signature = artifact.get("signature")
 
@@ -64,12 +62,15 @@ class MockAuthorizationVerifier(AuthorizationVerifier):
 
         return True, "VALID"
 
+
 # Global default verifier instance for reference harness
 default_verifier: AuthorizationVerifier = MockAuthorizationVerifier()
+
 
 def get_verifier() -> AuthorizationVerifier:
     """Returns the active authorization verifier instance."""
     return default_verifier
+
 
 def set_verifier(verifier: AuthorizationVerifier) -> None:
     """Sets the active authorization verifier instance."""
