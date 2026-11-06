@@ -12,6 +12,7 @@ extend-exclude = [
     "tests/test_hardening.py",
     "tests/test_ttl_enforcement.py",
     "tests/summit_q1/**",
+    "tests/summit_q2/**",
 ]
 
 [tool.ruff.lint]

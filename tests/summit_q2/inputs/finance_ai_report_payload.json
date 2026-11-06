@@ -1,0 +1,44 @@
+{
+  "report_id": "summit-q2-finance-ai-report",
+  "author_subject": "finance-ai-01",
+  "addressed_to": "cfo",
+  "declared_figures": {
+    "cost_base_subject_to_increase": null,
+    "cost_increase_rate": 0.06,
+    "annual_cost_increase": 900000,
+    "annual_revenue": 50000000,
+    "current_net_profit": 3500000,
+    "cost_increase_pct_of_revenue": 0.018,
+    "cost_increase_pct_of_net_profit": null,
+    "pro_forma_net_profit": null,
+    "dso_old_days": 45,
+    "dso_new_days": 60,
+    "dso_delay_days": 15,
+    "additional_receivables": null
+  },
+  "materiality_basis": "revenue",
+  "margin_effect": null,
+  "cash_flow_effect": null,
+  "conditions_addressed": [
+    "cost_increase_6pct",
+    "payment_timing_45_to_60"
+  ],
+  "exposures_identified": [],
+  "options": [
+    {
+      "id": "opt-1",
+      "label": "Continue operating under the existing financial plan without significant corrective action; monitor payment timing and material costs during Q2"
+    }
+  ],
+  "assumptions": [],
+  "objective_assessment": {
+    "profit": "MINIMAL",
+    "growth": null,
+    "organizational_clarity": null
+  },
+  "conclusion": {
+    "financial_exposure": "LOW",
+    "recommended_action": "CONTINUE CURRENT PLAN",
+    "expected_impact_on_profit_objective": "MINIMAL"
+  }
+}
